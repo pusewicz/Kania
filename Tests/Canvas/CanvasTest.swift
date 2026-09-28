@@ -1,5 +1,6 @@
 // Checks canvases: a canvas cleared to a colour reads back as that colour, a canvas released
-// mid-frame is destroyed only after the frame is presented, and a zero-sized canvas is an error.
+// mid-frame is destroyed only after the frame is presented, and a zero-sized or oversized canvas
+// is an error rather than a crash.
 // Exits with status 0 when all hold, and 1 with the reason when one does not.
 import CCute
 import Kania
@@ -23,7 +24,7 @@ struct CanvasTest: Game, ~Copyable {
   mutating func update() {
     switch frame {
     case 0:
-      checkZeroSizedCanvasThrows()
+      checkInvalidSizesThrow()
       releaseCanvasMidFrame()
       Draw.render(to: canvas)
       readback = canvas.readPixels()
@@ -36,11 +37,13 @@ struct CanvasTest: Game, ~Copyable {
     frame += 1
   }
 
-  private func checkZeroSizedCanvasThrows() {
-    do {
-      _ = try Canvas(width: 0, height: 8)
-      fail("a 0 by 8 canvas was created")
-    } catch {}
+  private func checkInvalidSizesThrow() {
+    for (width, height) in [(0, 8), (Int.max, 2), (65_536, 65_536)] {
+      do {
+        _ = try Canvas(width: width, height: height)
+        fail("a \(width) by \(height) canvas was created")
+      } catch {}
+    }
   }
 
   /// Renders into a canvas that goes away at the end of this function, then checks that it is

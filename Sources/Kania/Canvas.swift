@@ -23,7 +23,14 @@ public struct Canvas: ~Copyable {
     guard width > 0, height > 0 else {
       throw KaniaError("a canvas must be at least 1 by 1 pixel, not \(width) by \(height)")
     }
-    let raw = cf_make_canvas(cf_canvas_defaults(Int32(width), Int32(height)))
+    // CF takes sizes, and reads pixels back, as 32-bit ints; a larger canvas must fail here, not trap.
+    let (pixelCount, overflowed) = width.multipliedReportingOverflow(by: height)
+    guard !overflowed, pixelCount <= Int(Int32.max) / 4, let cfWidth = Int32(exactly: width),
+      let cfHeight = Int32(exactly: height)
+    else {
+      throw KaniaError("a \(width) by \(height) canvas is too large to create or read back")
+    }
+    let raw = cf_make_canvas(cf_canvas_defaults(cfWidth, cfHeight))
     guard raw.id != 0 else { throw KaniaError("could not create a \(width) by \(height) canvas") }
     self.raw = raw
     self.width = width

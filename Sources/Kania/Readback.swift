@@ -76,6 +76,7 @@ public final class Readback {
       cf_destroy_readback(started)
       self.started = nil
     }
+    // Canvas.init guarantees this fits in the Int32 CF takes.
     let byteCount = width * height * 4
     var bytes = [UInt8](repeating: 0, count: byteCount)
     let copied = bytes.withUnsafeMutableBytes {
