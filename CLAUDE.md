@@ -25,9 +25,9 @@ Kania API tests. Beyond that, verification is a screenshot and the benchmark che
 `--count 1000 --frames 60`, whose JSON `checksum` fields must be equal. On Windows, configure from
 a Visual Studio developer prompt.
 
-sourcekit-lsp and clangd read `build/release/compile_commands.json` (set in
-`.sourcekit-lsp/config.json` and `.clangd`), so code intelligence, Serena's included, needs the
-release preset configured.
+Code intelligence, Serena's included, reads the compile database that CMake writes. sourcekit-lsp
+takes it from `build/release`, else `build/debug` (`.sourcekit-lsp/config.json`); clangd takes one
+path only, `build/release` (`.clangd`). Configure the release preset first.
 
 ## How the pieces fit
 

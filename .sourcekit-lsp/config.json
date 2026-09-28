@@ -1,3 +1,3 @@
 {
-  "compilationDatabase": { "searchPaths": ["build/release"] }
+  "compilationDatabase": { "searchPaths": ["build/release", "build/debug"] }
 }

@@ -6,6 +6,6 @@
 
 ## Code intelligence
 
-- sourcekit-lsp (Swift) and clangd (C) both read `build/release/compile_commands.json`, pinned by `.sourcekit-lsp/config.json` and `.clangd`. Neither works until `cmake --preset release` has run.
+- Both presets export `compile_commands.json`. sourcekit-lsp (Swift) uses `build/release`, else `build/debug` (`.sourcekit-lsp/config.json`; first existing path wins). clangd (C) uses `build/release` only (`.clangd` accepts a single path). Configure `release` first.
 - The compile database names swiftly's `swiftc`; the sourcekit-lsp reading it must be swiftly's too, not Xcode's or the Command Line Tools'.
 - Serena reads `.serena/project.yml` (`swift`, then `cpp`) only at startup; reconnect the MCP server after changing it.
