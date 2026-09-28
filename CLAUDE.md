@@ -69,6 +69,10 @@ push it, open the PR with `gh pr create`, and stop there: the owner reviews and 
 commit. Merged branches are deleted automatically. The `macos` and `linux` CI jobs must pass; the
 Windows job doesn't block yet.
 
+Swift code is written by the `swift-writer` subagent (`.claude/agents/swift-writer.md`), which is
+pinned to Sonnet 5.5. Delegate Swift edits to it and never pass `model` when invoking it, because
+that overrides the pin. It edits and verifies; git, PRs and the plan stay with the main session.
+
 ## CF changes
 
 CF is pinned at a commit on the `kania` branch of the submodule (pusewicz/cute_framework): upstream
