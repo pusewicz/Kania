@@ -27,6 +27,11 @@ that, verification is a screenshot and the benchmark checksum:
 `--count 1000 --frames 60`, whose JSON `checksum` fields must be equal. On Windows, configure from
 a Visual Studio developer prompt.
 
+Code intelligence, Serena's included, reads the compile database that CMake writes. sourcekit-lsp
+takes it from `build/release`, else `build/debug` (`.sourcekit-lsp/config.json`); clangd takes one
+path only, `build/release` (`.clangd`). Configure the release preset first. Swift references come
+from the index store the build writes, so they are as current as the last build.
+
 ## How the pieces fit
 
 - **CMake builds everything.** `CMakeLists.txt` adds CF (the submodule) as a subproject, and CF
@@ -42,6 +47,8 @@ a Visual Studio developer prompt.
     build machine's OS.
   - The MSVC release DLL runtime on Windows, and the `lib` prefix on Swift static libraries there,
     which is the name their modules autolink.
+  - An index store for sourcekit-lsp (`KANIA_INDEX_STORE`, on when Kania is top-level), which
+    reads one but doesn't index a compile-database project itself.
   - Linux `-pthread` handling: SDL3 and s2n link with it, and swiftc rejects it.
   - `swiftc` from `PATH`, set in the presets. Otherwise CMake on macOS asks `xcrun` and gets the
     Command Line Tools' Swift, not the swiftly toolchain.
