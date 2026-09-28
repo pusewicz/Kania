@@ -6,3 +6,4 @@
 .build-*/
 /Results/raw-progress.log
 /.build-linux.log
+.ruby-lsp/
