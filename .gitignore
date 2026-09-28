@@ -1,0 +1,8 @@
+.build/
+/Vendor/prebuilt/
+/Vendor/build/
+*.dSYM
+.DS_Store
+/Results/raw/
+.build-*/
+/Results/raw-progress.log
