@@ -7,8 +7,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 IMAGE="${SWIFT_IMAGE:-swift:6.4-noble}"
 
+# In a git worktree, .git is a file pointing into the main repository's .git directory. Mount that
+# directory at its own path too, so git still finds the repository inside the container.
+MOUNTS=(-v "$ROOT:/work")
+GIT_COMMON="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir)"
+case "$GIT_COMMON" in "$ROOT"/*) ;; *) MOUNTS+=(-v "$GIT_COMMON:$GIT_COMMON") ;; esac
+
 # --init: without an init process, xvfb-run ends up as PID 1 and hangs waiting for Xvfb to start.
-docker run --rm --init -v "$ROOT:/work" -w /work "$IMAGE" bash -c '
+docker run --rm --init "${MOUNTS[@]}" -w /work "$IMAGE" bash -c '
   set -euo pipefail
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -qq >/dev/null
