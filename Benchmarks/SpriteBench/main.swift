@@ -11,8 +11,8 @@ import SpikeSupport
 
 /// The sprite implementations, in report order.
 let spriteImpls = [
-  "raw-array", "raw-buffer", "overlay-struct", "overlay-span", "overlay-inout", "overlay-unique",
-  "overlay-class",
+  "raw-array", "raw-buffer", "overlay-struct", "overlay-span", "overlay-span-inplace", "overlay-inout",
+  "overlay-unique", "overlay-class",
 ]
 
 if CommandLine.arguments.dropFirst().elementsEqual(["--list-impls"]) {
@@ -44,6 +44,7 @@ func makeWorkload(scene: String, impl: String, count: Int) -> any Workload {
   case ("sprites", "raw-buffer"): return RawBufferWorkload(count: count)
   case ("sprites", "overlay-struct"): return OverlayStructWorkload(count: count)
   case ("sprites", "overlay-span"): return OverlaySpanWorkload(count: count)
+  case ("sprites", "overlay-span-inplace"): return OverlaySpanInPlaceWorkload(count: count)
   case ("sprites", "overlay-inout"): return OverlayInoutWorkload(count: count)
   case ("sprites", "overlay-unique"): return OverlayUniqueWorkload(count: count)
   case ("sprites", "overlay-class"): return OverlayClassWorkload(count: count)

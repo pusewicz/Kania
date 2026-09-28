@@ -115,6 +115,11 @@ struct Sprite {
   func draw() {
     withUnsafePointer(to: raw) { cf_draw_sprite($0) }
   }
+
+  /// Queues the sprite with CF's draw API, handing CF this value's own storage. `draw()` passes a
+  /// copy, because a pointer to a non-`inout` value points at a temporary. This is `mutating`
+  /// only for the address; CF reads the sprite and does not change it.
+  mutating func drawInPlace() { cf_draw_sprite(&raw) }
 }
 
 /// A game entity written in plain Swift over the value-type wrapper.
@@ -186,6 +191,37 @@ final class OverlaySpanWorkload: Workload {
     for i in span.indices {
       span[i].step(bounds: bounds)
       span[i].sprite.draw()
+    }
+  }
+}
+
+/// `overlay-span` without the two costs it keeps over C: elements are read without bounds checks,
+/// because every index comes from the span's own `indices`, and CF gets each sprite in place
+/// rather than a copy.
+final class OverlaySpanInPlaceWorkload: Workload {
+  private var entities: [Entity] = []
+  private let bounds = Vec2(width / 2, height / 2)
+
+  var checksum: Double {
+    entities.reduce(0) { $0 + Double($1.sprite.position.x) + Double($1.sprite.position.y) }
+  }
+
+  /// Creates `count` entities in the order the C benchmark does.
+  init(count: Int) {
+    entities.reserveCapacity(count)
+    makeEntities(count: count) { sprite, position, velocity in
+      var s = Sprite(sprite)
+      s.position = Vec2(position)
+      entities.append(Entity(sprite: s, velocity: Vec2(velocity)))
+    }
+  }
+
+  /// Steps and draws every entity through one mutable span, unchecked and in place.
+  func step(frame: Int) {
+    var span = entities.mutableSpan
+    for i in span.indices {
+      unsafe span[unchecked: i].step(bounds: bounds)
+      unsafe span[unchecked: i].sprite.drawInPlace()
     }
   }
 }

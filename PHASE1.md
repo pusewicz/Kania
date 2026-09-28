@@ -14,7 +14,7 @@ deferred to the phases that later rewrite each subsystem.
 | Isolation | **`@MainActor`.** SDL3 wants windowing and events on the main thread, and CF's state is global. The public API is annotated explicitly rather than through a module-wide default-isolation flag, so the isolation shows in the interface whatever the build system. |
 | GPU and audio handles | **`~Copyable` owners plus `Hashable` IDs.** `Texture`, `Canvas`, `Shader`, `Mesh`, `Material`, `Audio` and the other types CF makes you destroy are `~Copyable` structs whose `deinit` queues the destroy. Each has a copyable, `Hashable` `ID` for dictionary keys and non-owning references. Types with nothing to destroy (`Sprite`, `Color`, vectors, transforms) stay copyable. |
 | Errors | **Typed `throws`** in place of `CF_Result`. Swift 6.4's typed-throwing `Task` initializers carry the same error type across `async` code. |
-| Draw path | **Value-type sprites, `inout [Sprite]` in the signature, `mutableSpan` inside.** Measured below: a span loop is within 4–6% of C, indexing the `inout` array directly costs 9–10%, and a class-held `UniqueArray` 13–20%. |
+| Draw path | **Value-type sprites, `inout [Sprite]` in the signature, `mutableSpan` inside, and each sprite handed to CF in place.** Measured below: that loop matches C (+1.2% at 10k, −2.8% at 1k). Passing CF a copy instead costs up to 6%, indexing the `inout` array directly 9–10%, and a class-held `UniqueArray` 13–20%. |
 | Minimum Apple versions | **Stay at macOS 26 and iOS 26.** The standard library's `UniqueArray` needs macOS 27 / iOS 27. Where Kania needs a noncopyable-capable array, it uses swift-collections' `BasicContainers.UniqueArray`, a stable module that runs on macOS 26 and builds with CMake. |
 
 ## What the decisions imply
@@ -78,6 +78,34 @@ Max, Swift 6.4, `-O`): the median of 3 interleaved runs of 300 frames each, all 
 - **So Kania's batch APIs take `inout [Sprite]`, which is familiar and needs no new types, and
   iterate through `mutableSpan` inside.** Game code that loops over its own sprites gets the same
   advice in the docs.
+
+### Closing the last gap: no copy on the way into C
+
+The span loop still trailed C. Its disassembly showed why: `Sprite.draw()` called
+`withUnsafePointer(to: raw)` on a non-`inout` value, which points at a temporary, so all 144
+bytes of `CF_Sprite` were copied to the stack before every `cf_draw_sprite`. `overlay-span-inplace`
+hands CF the element's own storage (`cf_draw_sprite(&raw)` in a `mutating` method reached through
+the span) and reads elements with `subscript(unchecked:)`. Its loop has no copy. The plain span
+loop already had no per-element bounds-check traps, so the copy was the difference. One batch,
+3 runs of 300 frames (`Results/macos-arm64-phase1-inplace.md`):
+
+| count | impl | submit ms | vs C |
+|---:|---|---:|---:|
+| 1000 | c | 0.0538 | |
+| 1000 | raw-buffer | 0.0530 | −1.5% |
+| 1000 | overlay-span | 0.0542 | +0.7% |
+| 1000 | overlay-span-inplace | 0.0523 | −2.8% |
+| 10000 | c | 0.5193 | |
+| 10000 | raw-buffer | 0.5268 | +1.4% |
+| 10000 | overlay-span | 0.5491 | +5.7% |
+| 10000 | overlay-span-inplace | 0.5255 | +1.2% |
+
+The in-place loop is at C and at `raw-buffer`, the floor. Kania's draw path therefore never hands a
+C function a pointer to a copied value: the internal loop passes each element's storage through
+the span. Game code never sees this. The display paced frames to 16 ms during this batch, which
+slows each run down but leaves `submit_ms` comparable within the batch. Going faster than C
+means changing CF's per-sprite work, which is phase 6.
+
 
 ## Open
 
