@@ -84,6 +84,10 @@ static inline void cfs_host_unbuffer_stdout(void) {
 #endif
 }
 
+/* Glibc declares `stderr` as a mutable global, which Swift 6 rejects, and the Windows CRT
+ * defines it as a macro, which Swift does not import. */
+static inline void cfs_host_print_error(const char* message) { fputs(message, stderr); }
+
 /* cf_destroy_binding */
 static inline void cfs_destroy_binding_button(CF_ButtonBinding b) { cf_destroy_button_binding(b); }
 static inline void cfs_destroy_binding_axis(CF_AxisBinding a) { cf_destroy_axis_binding(a); }

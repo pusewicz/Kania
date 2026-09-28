@@ -18,7 +18,7 @@ public struct SpikeOptions {
     while let flag = arguments.popFirst() {
       let name = String(flag.drop(while: { $0 == "-" }))
       guard flag.hasPrefix("--"), allowed.contains(name), let value = arguments.popFirst() else {
-        fputs("unknown or incomplete option \(flag); allowed: \(allowed.sorted())\n", stderr)
+        cfs_host_print_error("unknown or incomplete option \(flag); allowed: \(allowed.sorted())\n")
         exit(2)
       }
       values[name] = value
@@ -107,12 +107,12 @@ public func savePNG(of canvas: CF_Canvas, width: Int32, height: Int32, to path: 
     var png: UnsafeMutableRawPointer? = nil
     var size: Int32 = 0
     guard !cf_is_error(cf_image_save_png_to_memory(&image, &png, &size)), let png else {
-      fputs("screenshot: PNG encoding failed\n", stderr)
+      cfs_host_print_error("screenshot: PNG encoding failed\n")
       return
     }
     defer { cf_free(png) }
     guard let file = fopen(path, "wb") else {
-      fputs("screenshot: cannot open \(path)\n", stderr)
+      cfs_host_print_error("screenshot: cannot open \(path)\n")
       return
     }
     fwrite(png, 1, Int(size), file)

@@ -1,7 +1,7 @@
 // Swift side of the Phase 0 draw-path benchmark. Benchmarks/SpriteBenchC is the C twin;
 // both must run the same workload, so change them together.
 //
-// Usage: SpriteBench [--impl raw-array|raw-buffer|overlay-struct|overlay-class]
+// Usage: SpriteBench [--impl raw-array|raw-buffer|overlay-struct|overlay-span|overlay-class]
 //                    [--scene sprites|text] [--count N] [--frames N] [--warmup N] [--hidden 0|1]
 //                    [--screenshot path]
 // Prints one JSON line with per-frame CPU submission and whole-frame times in milliseconds.
@@ -24,15 +24,22 @@ let result = cf_make_app(
 guard !cf_is_error(result) else { fatalError("cf_make_app failed") }
 let immediate = cf_app_set_present_mode(CF_PRESENT_MODE_IMMEDIATE)
 
-let workload: any Workload =
+/// Creates the workload for `scene` and `impl`, exiting on an unknown or unavailable pair.
+func makeWorkload(scene: String, impl: String, count: Int) -> any Workload {
   switch (scene, impl) {
-  case ("text", _): TextWorkload(count: count)
-  case ("sprites", "raw-array"): RawArrayWorkload(count: count)
-  case ("sprites", "raw-buffer"): RawBufferWorkload(count: count)
-  case ("sprites", "overlay-struct"): OverlayStructWorkload(count: count)
-  case ("sprites", "overlay-class"): OverlayClassWorkload(count: count)
+  case ("text", _): return TextWorkload(count: count)
+  case ("sprites", "raw-array"): return RawArrayWorkload(count: count)
+  case ("sprites", "raw-buffer"): return RawBufferWorkload(count: count)
+  case ("sprites", "overlay-struct"): return OverlayStructWorkload(count: count)
+  case ("sprites", "overlay-span"):
+    guard #available(macOS 26, iOS 26, *) else { fatalError("overlay-span needs Array.mutableSpan") }
+    return OverlaySpanWorkload(count: count)
+  case ("sprites", "overlay-class"): return OverlayClassWorkload(count: count)
   default: fatalError("unknown scene/impl \(scene)/\(impl)")
   }
+}
+
+let workload = makeWorkload(scene: scene, impl: impl, count: count)
 
 var submit: [Double] = []
 var whole: [Double] = []

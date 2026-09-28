@@ -3,6 +3,6 @@
 /Vendor/build/
 *.dSYM
 .DS_Store
-/Results/raw/
 .build-*/
 /Results/raw-progress.log
+/.build-linux.log

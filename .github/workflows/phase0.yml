@@ -30,7 +30,7 @@ jobs:
       - run: swift build -c release
       - run: swift format lint --strict --recursive Package.swift Sources Samples Benchmarks
       - run: .build/out/Products/Release/HelloTriangle --frames 30 --screenshot hello-macos.png
-      - run: Scripts/bench.rb --label ci-macos --runs 3 --frames 300 | tee bench-macos.md
+      - run: Scripts/bench.rb --label ci-macos --runs 3 --frames 300 --output bench-macos.md
       - uses: actions/upload-artifact@v4
         with: { name: macos, path: "hello-macos.png\nbench-macos.md\nResults/raw/" }
 
@@ -64,7 +64,7 @@ jobs:
           export XDG_RUNTIME_DIR=/tmp/xdg; mkdir -p "$XDG_RUNTIME_DIR"; chmod 700 "$XDG_RUNTIME_DIR"
           B="$(swift build -c release --show-bin-path)"
           xvfb-run -a -s "-screen 0 1280x960x24" "$B/HelloTriangle" --frames 30 --screenshot hello-linux.png
-          xvfb-run -a -s "-screen 0 1280x960x24" Scripts/bench.rb --label ci-linux --runs 3 --frames 300 | tee bench-linux.md
+          xvfb-run -a -s "-screen 0 1280x960x24" Scripts/bench.rb --label ci-linux --runs 3 --frames 300 --output bench-linux.md
       - uses: actions/upload-artifact@v4
         with: { name: linux, path: "hello-linux.png\nbench-linux.md\nResults/raw/" }
 
@@ -94,7 +94,7 @@ jobs:
           $bin = swift build -c release --show-bin-path
           & "$bin\HelloTriangle.exe" --frames 30 --screenshot hello-windows.png
           Write-Host "HelloTriangle exit=$LASTEXITCODE"
-          ruby Scripts/bench.rb --label ci-windows --runs 3 --frames 300 | Tee-Object bench-windows.md
+          ruby Scripts/bench.rb --label ci-windows --runs 3 --frames 300 --output bench-windows.md
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: windows, path: "hello-windows.png\nbench-windows.md\nResults/raw/" }

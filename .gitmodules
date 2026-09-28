@@ -1,3 +1,4 @@
 [submodule "Vendor/cute_framework"]
 	path = Vendor/cute_framework
 	url = https://github.com/pusewicz/cute_framework.git
+	branch = kania

@@ -145,6 +145,35 @@ final class OverlayStructWorkload: Workload {
   }
 }
 
+/// The value-type overlay iterated through a `MutableSpan`: one exclusive access to the array
+/// for the whole loop instead of one per element, with bounds checks kept.
+@available(macOS 26, iOS 26, *)
+final class OverlaySpanWorkload: Workload {
+  private var entities: [Entity] = []
+  private let bounds = Vec2(width / 2, height / 2)
+
+  var checksum: Double {
+    entities.reduce(0) { $0 + Double($1.sprite.position.x) + Double($1.sprite.position.y) }
+  }
+
+  init(count: Int) {
+    entities.reserveCapacity(count)
+    makeEntities(count: count) { sprite, position, velocity in
+      var s = Sprite(sprite)
+      s.position = Vec2(position)
+      entities.append(Entity(sprite: s, velocity: Vec2(velocity)))
+    }
+  }
+
+  func step(frame: Int) {
+    var span = entities.mutableSpan
+    for i in span.indices {
+      span[i].step(bounds: bounds)
+      span[i].sprite.draw()
+    }
+  }
+}
+
 /// A reference-type sprite node, the shape a scene-graph style API would take.
 final class SpriteNode {
   var sprite: Sprite

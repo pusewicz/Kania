@@ -25,7 +25,7 @@ swift build -c release
 B=$(swift build -c release --show-bin-path)
 $B/HelloTriangle                                  # Swift port of CF's hello_triangle sample
 $B/SpriteBenchC --count 10000                     # C baseline
-$B/SpriteBench --count 10000 --impl raw-array     # Swift twin; also raw-buffer, overlay-struct, overlay-class
+$B/SpriteBench --count 10000 --impl raw-array     # Swift twin; see --impl in its main.swift
 Scripts/bench.rb --label local                    # full matrix, Markdown table on stdout
 ```
 
@@ -42,6 +42,7 @@ Sources/SpikeSupport/    option parsing, timing summaries, PNG screenshots
 Samples/HelloTriangle/   low-level graphics API from Swift
 Benchmarks/SpriteBench*/ draw-path benchmark, C and Swift twins
 Scripts/bench.rb         runs the benchmark matrix
+Scripts/linux-container.sh  builds and benchmarks in the Swift Linux image (Xvfb + lavapipe)
 Results/                 benchmark tables per platform
 ```
 

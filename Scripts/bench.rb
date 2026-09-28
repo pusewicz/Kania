@@ -3,10 +3,10 @@
 
 # Runs the Phase 0 draw-path benchmark matrix: the C baseline and every Swift variant at each
 # sprite count, interleaved round-robin so thermal drift hits all of them equally. Prints a
-# Markdown table and writes every raw run to Results/raw/<label>.jsonl.
+# Markdown table (also to --output when given) and writes every raw run to Results/raw/<label>.jsonl.
 #
 # Usage: Scripts/bench.rb [--label NAME] [--runs N] [--counts 100,1000,10000] [--frames N]
-#                         [--text-counts 100,1000] [--bin DIR] [--c-bin DIR]
+#                         [--text-counts 100,1000] [--bin DIR] [--c-bin DIR] [--output FILE]
 # Build first: swift build -c release (and any KANIA_BENCH_SWIFTFLAGS variant into --bin).
 
 require "json"
@@ -15,7 +15,7 @@ require "fileutils"
 require "rbconfig"
 
 ROOT = File.expand_path("..", __dir__)
-SWIFT_IMPLS = %w[raw-array raw-buffer overlay-struct overlay-class].freeze
+SWIFT_IMPLS = %w[raw-array raw-buffer overlay-struct overlay-span overlay-class].freeze
 
 options = {
   label: "local",
@@ -24,7 +24,8 @@ options = {
   text_counts: [100, 1_000],
   frames: 600,
   bin: nil,
-  c_bin: nil
+  c_bin: nil,
+  output: nil
 }
 OptionParser.new do |o|
   o.on("--label NAME") { |v| options[:label] = v }
@@ -34,10 +35,10 @@ OptionParser.new do |o|
   o.on("--frames N", Integer) { |v| options[:frames] = v }
   o.on("--bin DIR", "directory with SpriteBench") { |v| options[:bin] = v }
   o.on("--c-bin DIR", "directory with SpriteBenchC") { |v| options[:c_bin] = v }
+  o.on("--output FILE", "also write the table here") { |v| options[:output] = v }
 end.parse!
 
-default_bin = `swift build -c release --show-bin-path`.strip
-bin = options[:bin] || default_bin
+bin = options[:bin] || `swift build -c release --show-bin-path`.strip
 c_bin = options[:c_bin] || bin
 exe = RbConfig::CONFIG["host_os"].match?(/mswin|mingw/) ? ".exe" : ""
 
@@ -83,8 +84,10 @@ def median(values)
   sorted[(sorted.size - 1) / 2]
 end
 
-puts "| scene | count | impl | submit ms (median) | vs C | per item ns | frame ms (median) | checksum |"
-puts "|---|---:|---|---:|---:|---:|---:|---|"
+table = [
+  "| scene | count | impl | submit ms (median) | vs C | per item ns | frame ms (median) | checksum |",
+  "|---|---:|---|---:|---:|---:|---:|---|"
+]
 cases.each do |impl, scene, count|
   runs = results[[impl, scene, count]]
   submit = median(runs.map { |r| r.dig("submit_ms", "median") })
@@ -93,7 +96,9 @@ cases.each do |impl, scene, count|
   c_checksum = results[["c", scene, count]].first["checksum"]
   checksums = runs.map { |r| r["checksum"] }.uniq
   parity = checksums == [c_checksum] ? "matches C" : "DIFFERS #{checksums.inspect} vs #{c_checksum}"
-  puts format("| %s | %d | %s | %.4f | %+.1f%% | %.1f | %.3f | %s |", scene, count, impl, submit,
-              (submit / c_submit - 1) * 100, submit * 1e6 / count, frame, parity)
+  table << format("| %s | %d | %s | %.4f | %+.1f%% | %.1f | %.3f | %s |", scene, count, impl, submit,
+                  (submit / c_submit - 1) * 100, submit * 1e6 / count, frame, parity)
 end
+puts table
+File.write(options[:output], table.join("\n") + "\n") if options[:output]
 warn "raw runs: #{raw_path}"
