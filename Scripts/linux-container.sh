@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Builds CF and the Phase 0 targets inside the official Swift Linux image (native architecture),
-# then runs HelloTriangle and the benchmark matrix under Xvfb with Mesa's lavapipe Vulkan driver.
-# Writes Results/linux-<arch>.md and .build-linux/hello.png.
+# Builds Kania with CMake inside the official Swift Linux image (native architecture), then runs
+# HelloTriangle and the benchmark matrix under Xvfb with Mesa's lavapipe Vulkan driver.
+# Writes Results/linux-<arch>.md and build/linux-<arch>/hello.png.
 # Usage: Scripts/linux-container.sh [bench.rb options...]
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -20,12 +20,12 @@ docker run --rm -v "$ROOT:/work" -w /work -e BENCH_ARGS="$*" "$IMAGE" bash -c '
   git config --global --add safe.directory "*"
   export PATH="$(bash Scripts/install-cmake-linux.sh):$PATH"
   swift --version
-  triple="$(uname -m)-unknown-linux-gnu"
-  [ -f "Vendor/prebuilt/$triple/lib/libcute.a" ] || Scripts/build-cf.sh "$triple"
-  swift build -c release --scratch-path .build-linux
-  bin="$(swift build -c release --scratch-path .build-linux --show-bin-path)"
+  build="build/linux-$(uname -m)"
+  cmake --preset release -B "$build"
+  cmake --build "$build"
+  bin="$build/bin"
   export XDG_RUNTIME_DIR=/tmp/xdg; mkdir -p "$XDG_RUNTIME_DIR"; chmod 700 "$XDG_RUNTIME_DIR"
-  xvfb-run -a -s "-screen 0 1280x960x24" "$bin/HelloTriangle" --frames 30 --screenshot .build-linux/hello.png
-  xvfb-run -a -s "-screen 0 1280x960x24" ruby Scripts/bench.rb --label "linux-$(uname -m)" --bin "$bin" \
-    --output "Results/linux-$(uname -m).md" $BENCH_ARGS
+  # One X server for both: a second xvfb-run straight after the first can hang starting Xvfb.
+  xvfb-run -a -s "-screen 0 1280x960x24" sh -c "\"$bin/HelloTriangle\" --frames 30 --screenshot \"$build/hello.png\" &&
+    ruby Scripts/bench.rb --label linux-$(uname -m) --bin \"$bin\" --output Results/linux-$(uname -m).md $BENCH_ARGS"
 '

@@ -10,7 +10,8 @@
 #                         [--output FILE]
 # --impls limits the Swift sprite implementations; C always runs as the baseline.
 # --text-counts '' skips the text scene.
-# Build first: swift build -c release (and any KANIA_BENCH_SWIFTFLAGS variant into --bin).
+# Build first: cmake --preset release && cmake --build --preset release. For a compiler-flag variant,
+# configure another build directory with -DKANIA_BENCH_SWIFT_FLAGS=... and pass its bin/ as --bin.
 
 require "json"
 require "optparse"
@@ -42,12 +43,14 @@ OptionParser.new do |o|
   o.on("--output FILE", "also write the table here") { |v| options[:output] = v }
 end.parse!
 
-bin = options[:bin] || `swift build -c release --show-bin-path`.strip
+bin = options[:bin] || File.join(ROOT, "build/release/bin")
 c_bin = options[:c_bin] || bin
 exe = RbConfig::CONFIG["host_os"].match?(/mswin|mingw/) ? ".exe" : ""
 
 # SpriteBench names the sprite implementations it can run on this OS.
-listing = IO.popen([File.join(bin, "SpriteBench#{exe}"), "--list-impls"], &:read)
+sprite_bench = File.join(bin, "SpriteBench#{exe}")
+abort "#{sprite_bench} not found; build first (see the top of this script)" unless File.exist?(sprite_bench)
+listing = IO.popen([sprite_bench, "--list-impls"], &:read)
 abort "SpriteBench --list-impls failed:\n#{listing}" unless $?.success?
 swift_impls = listing.split
 if options[:impls]

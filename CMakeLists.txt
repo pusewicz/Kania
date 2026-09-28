@@ -1,0 +1,100 @@
+cmake_minimum_required(VERSION 4.2)
+
+# A game that pulls Kania in chooses these itself; Kania sets them only when built on its own.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET 26.0 CACHE STRING "Minimum macOS version")
+  # Swift on Windows links against the MSVC runtime, so CF and its C libraries are built with MSVC.
+  if(CMAKE_HOST_WIN32 AND NOT DEFINED CMAKE_C_COMPILER)
+    set(CMAKE_C_COMPILER cl)
+    set(CMAKE_CXX_COMPILER cl)
+  endif()
+endif()
+
+project(Kania LANGUAGES C CXX Swift)
+
+option(KANIA_BUILD_SAMPLES "Build the samples and benchmarks" ${PROJECT_IS_TOP_LEVEL})
+set(KANIA_BENCH_SWIFT_FLAGS "" CACHE STRING
+  "Extra Swift flags for SpriteBench only, e.g. -enforce-exclusivity=unchecked")
+
+set(CMAKE_C_STANDARD 23)
+# CMake gives C the macOS deployment target but not Swift, which then targets the build machine's
+# own OS version.
+if(APPLE AND CMAKE_OSX_DEPLOYMENT_TARGET AND NOT CMAKE_Swift_COMPILER_TARGET)
+  set(CMAKE_Swift_COMPILER_TARGET "${CMAKE_SYSTEM_PROCESSOR}-apple-macosx${CMAKE_OSX_DEPLOYMENT_TARGET}")
+endif()
+set(CMAKE_Swift_LANGUAGE_VERSION 6)
+set(CMAKE_Swift_COMPILATION_MODE "$<IF:$<CONFIG:Debug>,incremental,wholemodule>")
+set(CMAKE_Swift_MODULE_DIRECTORY ${PROJECT_BINARY_DIR}/swift)
+# Swift has no debug C runtime on Windows, so every configuration uses the release DLL runtime.
+set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
+if(PROJECT_IS_TOP_LEVEL)
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
+endif()
+
+# On Linux, SDL3 and s2n (CF's TLS library, through FindThreads) link with -pthread, which swiftc
+# rejects. Swift links hand it to clang, swiftc's linker driver, instead.
+set(kania_pthread_link_option "$<IF:$<LINK_LANGUAGE:Swift>,SHELL:-Xclang-linker -pthread,-pthread>")
+# FindThreads leaves an existing Threads::Threads alone, so creating it first lets Kania adjust it.
+if(UNIX AND NOT APPLE AND NOT TARGET Threads::Threads)
+  set(THREADS_PREFER_PTHREAD_FLAG ON)
+  find_package(Threads REQUIRED)
+  set_target_properties(Threads::Threads PROPERTIES
+    INTERFACE_LINK_LIBRARIES ""
+    INTERFACE_LINK_OPTIONS "${kania_pthread_link_option}")
+endif()
+
+# Cute Framework, pinned in the submodule. It fetches SDL3, Box2D, Box3D and PhysFS itself.
+set(CF_FRAMEWORK_STATIC ON)
+set(CF_CUTE_SHADERC OFF)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+add_subdirectory(Vendor/cute_framework EXCLUDE_FROM_ALL)
+
+if(TARGET SDL3-static)
+  get_target_property(sdl_link_options SDL3-static INTERFACE_LINK_OPTIONS)
+  if(sdl_link_options)
+    list(TRANSFORM sdl_link_options REPLACE "^-pthread$" "${kania_pthread_link_option}")
+    set_property(TARGET SDL3-static PROPERTY INTERFACE_LINK_OPTIONS "${sdl_link_options}")
+  endif()
+endif()
+
+# The C shim Swift imports CF through; see Sources/CCute/include/CCute.h.
+add_library(CCute STATIC Sources/CCute/CCute.c)
+target_include_directories(CCute PUBLIC Sources/CCute/include)
+target_link_libraries(CCute PUBLIC cute)
+
+add_library(Kania STATIC Sources/Kania/Kania.swift)
+target_include_directories(Kania INTERFACE ${CMAKE_Swift_MODULE_DIRECTORY})
+# Public: Kania's types will hold CF values, so clients need CCute to lay them out.
+target_link_libraries(Kania PUBLIC CCute)
+
+if(KANIA_BUILD_SAMPLES)
+  include(FetchContent)
+  # swift-collections turns on shared libraries on Darwin and Windows unless told otherwise.
+  set(BUILD_SHARED_LIBS OFF)
+  FetchContent_Declare(SwiftCollections
+    GIT_REPOSITORY https://github.com/apple/swift-collections
+    GIT_TAG 98ef3c98609a1e31b7e157b5b619579001a789d6 # 1.7.1
+    EXCLUDE_FROM_ALL)
+  FetchContent_MakeAvailable(SwiftCollections)
+
+  add_library(SpikeSupport STATIC Sources/SpikeSupport/Support.swift)
+  target_include_directories(SpikeSupport INTERFACE ${CMAKE_Swift_MODULE_DIRECTORY})
+  target_link_libraries(SpikeSupport PUBLIC CCute)
+
+  add_executable(HelloTriangle Samples/HelloTriangle/main.swift)
+  target_link_libraries(HelloTriangle PRIVATE SpikeSupport)
+
+  add_executable(SpriteBench
+    Benchmarks/SpriteBench/main.swift
+    Benchmarks/SpriteBench/Implementations.swift
+    Benchmarks/SpriteBench/Workload.swift)
+  target_link_libraries(SpriteBench PRIVATE SpikeSupport BasicContainers)
+  separate_arguments(kania_bench_swift_flags NATIVE_COMMAND "${KANIA_BENCH_SWIFT_FLAGS}")
+  target_compile_options(SpriteBench PRIVATE ${kania_bench_swift_flags})
+
+  add_executable(SpriteBenchC Benchmarks/SpriteBenchC/main.c)
+  target_link_libraries(SpriteBenchC PRIVATE CCute)
+  # CMake's Release level for C is already -O3, matching CF's. Swift never fuses a * b + c into
+  # an FMA and clang does by default; turn that off so both benchmarks' checksums agree bit for bit.
+  target_compile_options(SpriteBenchC PRIVATE $<$<NOT:$<C_COMPILER_ID:MSVC>>:-ffp-contract=off>)
+endif()

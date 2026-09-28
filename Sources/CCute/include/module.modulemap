@@ -1,0 +1,4 @@
+module CCute {
+  header "CCute.h"
+  export *
+}
