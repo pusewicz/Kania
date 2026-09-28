@@ -23,8 +23,24 @@
 
 #include <cute.h>
 
+/* SDL's main-callback entry points (SDL_RunApp, SDL_EnterAppMainCallbacks) and SDL_IsMainThread.
+ * SDL_MAIN_HANDLED stops SDL_main.h from renaming `main` in C files that include this header,
+ * such as the C benchmark. */
+#ifndef SDL_MAIN_HANDLED
+#define SDL_MAIN_HANDLED
+#endif
+#include <SDL3/SDL_main.h>
+
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#if !defined(__APPLE__)
+/* Swift runs main-actor jobs on libdispatch's main queue. Apple platforms drain it from the system
+ * run loop; on Linux and Windows nothing drains it while SDL's frame loop runs, so Kania drains it
+ * once per frame through the hook Foundation's run loop uses. Call only on the main thread. */
+void _dispatch_main_queue_callback_4CF(void* msg);
+static inline void cfs_drain_main_queue(void) { _dispatch_main_queue_callback_4CF(NULL); }
 #endif
 
 /* cf_binding_value */

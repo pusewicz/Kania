@@ -13,6 +13,7 @@ endif()
 project(Kania LANGUAGES C CXX Swift)
 
 option(KANIA_BUILD_SAMPLES "Build the samples and benchmarks" ${PROJECT_IS_TOP_LEVEL})
+option(KANIA_BUILD_TESTS "Build the tests" ${PROJECT_IS_TOP_LEVEL})
 set(KANIA_BENCH_SWIFT_FLAGS "" CACHE STRING
   "Extra Swift flags for SpriteBench only, e.g. -enforce-exclusivity=unchecked")
 
@@ -62,10 +63,24 @@ add_library(CCute STATIC Sources/CCute/CCute.c)
 target_include_directories(CCute PUBLIC Sources/CCute/include)
 target_link_libraries(CCute PUBLIC cute)
 
-add_library(Kania STATIC Sources/Kania/Kania.swift)
+add_library(Kania STATIC
+  Sources/Kania/App.swift
+  Sources/Kania/Game.swift
+  Sources/Kania/Kania.swift
+  Sources/Kania/KaniaError.swift)
 target_include_directories(Kania INTERFACE ${CMAKE_Swift_MODULE_DIRECTORY})
 # Public: Kania's types will hold CF values, so clients need CCute to lay them out.
 target_link_libraries(Kania PUBLIC CCute)
+# Kania drains libdispatch's main queue itself on Linux and Windows; see CCute.h.
+target_link_libraries(Kania PUBLIC $<$<OR:$<PLATFORM_ID:Linux>,$<PLATFORM_ID:Windows>>:dispatch>)
+
+if(KANIA_BUILD_TESTS)
+  enable_testing()
+  add_executable(AppLoopTest Tests/AppLoop/AppLoopTest.swift)
+  target_compile_options(AppLoopTest PRIVATE -parse-as-library)
+  target_link_libraries(AppLoopTest PRIVATE Kania)
+  add_test(NAME app-loop COMMAND AppLoopTest)
+endif()
 
 if(KANIA_BUILD_SAMPLES)
   include(FetchContent)

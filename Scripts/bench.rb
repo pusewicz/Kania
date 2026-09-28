@@ -42,6 +42,9 @@ OptionParser.new do |o|
   o.on("--c-bin DIR", "directory with SpriteBenchC") { |v| options[:c_bin] = v }
   o.on("--output FILE", "also write the table here") { |v| options[:output] = v }
 end.parse!
+abort "unexpected arguments: #{ARGV.join(" ")}" unless ARGV.empty?
+counts = options[:counts] + options[:text_counts]
+abort "counts must be positive: #{counts.join(", ")}" unless counts.all?(&:positive?)
 
 bin = options[:bin] || File.join(ROOT, "build/release/bin")
 c_bin = options[:c_bin] || bin

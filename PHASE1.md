@@ -24,16 +24,8 @@ deferred to the phases that later rewrite each subsystem.
   `cf_app_draw_onto_screen` flushes it, so a texture destroyed mid-frame after being drawn is a
   use-after-free at the flush. `deinit` therefore queues the destroy, and the app loop drains the
   queue after the flush. An explicit `destroy()` would need the same queue.
-- **The frame loop has to let main-actor tasks run, on the main thread.** A synchronous `while` loop
-  on the main thread never returns to the main queue. On macOS, SDL's event pump is expected to drain
-  it, because it runs the main run loop. On Linux nothing drains it, and the plan already notes that
-  `DispatchQueue.main` is not the main thread on Windows. Swift's custom main executors, which would
-  let Kania drain the main actor itself each frame, are still a pitch (fourth revision, August 2026).
-  So the app loop is `async`, entered from an `async` `@main`, and suspends once per frame. A test on
-  all three desktop OSes checks two things: a `Task { @MainActor in }` created during one frame has
-  run by the next, and `SDL_IsMainThread()` is true inside the loop. If the second fails on Windows,
-  the main actor is not the OS main thread there, and the loop has to be a synchronous main-thread
-  loop that drains its own queue instead.
+- **SDL owns the frame loop; main-actor tasks still have to run between frames.** See *App loop*
+  below.
 - **`~Copyable` handles spread to whatever stores them.** A struct that stores a `Texture` must itself
   be `~Copyable`, and `Array`, `Set` and `Dictionary` can't hold them. The `ID` types, and borrow
   accessors such as `canvas.texture`, keep that out of ordinary game code. Handles are also
@@ -141,8 +133,47 @@ CMake did less than SwiftPM had done implicitly, and each gap was silent until c
   `BUILD_SHARED_LIBS` is already set, and every module joins `all`. The build sets
   `BUILD_SHARED_LIBS OFF` and fetches it `EXCLUDE_FROM_ALL`.
 
-Two `xvfb-run` calls back to back in one container sometimes hung while the second started
-Xvfb, so the Linux job and `Scripts/linux-container.sh` now run everything under one X server.
+`xvfb-run` hung in `Scripts/linux-container.sh` whenever it became the container's PID 1, as the
+last command of `bash -c` does. It waits for a signal from Xvfb that never arrives there. The
+script runs the container with `docker run --init`. GitHub Actions keeps its own process as PID 1,
+so CI never had the problem.
+
+## App loop (2026-09-28)
+
+Kania runs a game through SDL's main callbacks, as CF supports since 2026-09-18
+(`docs/topics/app_callbacks.md`). Callbacks avoid the frozen window while it is dragged or
+resized, and they are how SDL integrates with iOS and the browser. A game marks a type
+`@main` and conforms it to `Game`. `Game.main()` calls `SDL_RunApp` and `SDL_EnterAppMainCallbacks`
+with Kania's own callbacks, written in Swift. CF's `CF_MAIN` macro is not used, because it has to
+be defined in a C file of the game. Each frame, Kania calls CF's update, the game's `update()` and
+`draw()`, then CF's present.
+
+- **Isolation.** SDL calls start, iterate and quit on the main thread, so Kania enters the main
+  actor with `MainActor.assumeIsolated`. The event callback stays outside it, because SDL delivers
+  lifecycle events (terminating, low memory, background and foreground) straight from the thread
+  that raised them. When that happens on another thread, SDL also dispatches every queued event
+  from that thread.
+- **Events off the main thread are dropped for now.** CF's event queue is not thread-safe, so
+  Kania passes CF only events that arrive on the main thread. On the desktop that is every event
+  except in the rare case above. The proper fix, needed for iOS and Android, is a `Mutex`-guarded
+  buffer that the next iterate hands to CF.
+- **Main-actor tasks.** SDL's loop on macOS, Linux and Windows is a plain `while` loop; only iOS
+  uses a display link. On macOS, SDL's event pump runs the Cocoa run loop, which also runs
+  main-actor jobs. On Linux, and Windows, nothing does, so Kania drains libdispatch's main queue
+  after each frame through `_dispatch_main_queue_callback_4CF`, the hook Foundation's run loop
+  uses. It is never called on Apple platforms, where it is private API. Swift 6.4 has no public
+  main-executor API; custom main executors are still a pitch.
+- **Shutdown.** The quit callback releases the game before `cf_destroy_app`, so the game's
+  resources, and later the `~Copyable` handles' `deinit`s, are freed while CF still exists.
+
+`Tests/AppLoop` is a small game that `ctest` runs in its own process, because SDL's loop needs the
+process's real `main`. It checks that every frame runs on SDL's main thread and that a
+`Task { @MainActor in }` started in frame 0 has run before frame 1's update. It passes on macOS and
+on Linux under Xvfb. With the Linux drain removed, it fails with "a main-actor task started in
+frame 0 had not run by frame 1", so the test is what catches a missing drain. Windows is not run
+yet. Swift Testing is not set up either; it comes with the Kania API tests (`p1-tests`), since the
+loop can't run inside a test runner.
+
 
 ## Open
 

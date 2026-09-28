@@ -47,6 +47,7 @@ CMakeLists.txt           builds CF as a subproject, then Kania, samples and benc
 Sources/CCute/           C shim over CF for Swift (wraps _Generic macros and extern globals)
 Sources/Kania/           the Kania library (the API starts in phase 1)
 Examples/MinimalGame/    a game project consuming Kania with FetchContent
+Tests/AppLoop/           checks the frame loop; run with ctest
 Sources/SpikeSupport/    option parsing, timing summaries, PNG screenshots
 Samples/HelloTriangle/   low-level graphics API from Swift
 Benchmarks/SpriteBench*/ draw-path benchmark, C and Swift twins

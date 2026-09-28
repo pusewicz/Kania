@@ -13,12 +13,14 @@ installed with swiftly).
 ```sh
 cmake --preset release               # configure build/release with Ninja (debug preset: build/debug)
 cmake --build --preset release       # everything; executables land in build/release/bin
-swift format lint --strict --recursive Sources Samples Benchmarks Examples
+ctest --test-dir build/release --output-on-failure  # tests; on Linux, run under xvfb-run
+swift format lint --strict --recursive Sources Samples Benchmarks Examples Tests
 Scripts/bench.rb --impls a,b --runs 3 --frames 300  # focused comparison; rules in Benchmarks/CLAUDE.md
 Scripts/linux-container.sh           # Linux (native arch) build + HelloTriangle + benchmark in Docker, Xvfb + lavapipe
 ```
 
-There is no test target yet. Verification is a screenshot and the benchmark checksum:
+`ctest` runs `Tests/AppLoop`, a small game that checks the frame loop; Swift Testing comes with the
+Kania API tests. Beyond that, verification is a screenshot and the benchmark checksum:
 `HelloTriangle --frames 30 --screenshot out.png`, and `SpriteBench`/`SpriteBenchC` with
 `--count 1000 --frames 60`, whose JSON `checksum` fields must be equal. On Windows, configure from
 a Visual Studio developer prompt.
@@ -40,6 +42,12 @@ a Visual Studio developer prompt.
   - Linux `-pthread` handling: SDL3 and s2n link with it, and swiftc rejects it.
   - `swiftc` from `PATH`, set in the presets. Otherwise CMake on macOS asks `xcrun` and gets the
     Command Line Tools' Swift, not the swiftly toolchain.
+- **Kania runs games through SDL's main callbacks.** A game conforms a `@main` type to `Game`, and
+  `Game.main()` hands SDL Kania's callbacks, which enter the main actor with
+  `MainActor.assumeIsolated`. SDL's loop on Linux and Windows never drains libdispatch's main
+  queue, so Kania does after each frame; `Tests/AppLoop` fails without it. Only events that
+  arrive on the main thread reach CF, whose event queue is not thread-safe. `PHASE1.md` has the
+  details.
 - **`Sources/CCute` is the only C shim.** Swift drops C11 `_Generic` macros, variadic macros such
   as `cf_v2` (use `CF_V2(x:y:)`), and mutable C globals under Swift 6. The shim wraps the binding
   macros, CF's `extern` time globals and `stderr`. Glibc's `stderr` compiles on macOS but fails on
