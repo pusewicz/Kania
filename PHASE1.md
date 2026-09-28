@@ -103,6 +103,15 @@ slows each run down but leaves `submit_ms` comparable within the batch. Going fa
 means changing CF's per-sprite work, which is phase 6.
 
 
+### Trimming the benchmark (2026-09-28)
+
+The variants above answered their questions, so the benchmark now keeps two Swift variants:
+`raw-buffer`, the floor, and `overlay-span-inplace`, the shape Kania ships. The other variants, the
+text scene, the compiler-flag experiments (`KANIA_BENCH_SWIFT_FLAGS`) and the swift-collections
+dependency that `overlay-unique` needed are gone. They are in git at `af4b7c8`, for example
+`git show af4b7c8:Benchmarks/SpriteBench/Implementations.swift`. The tables here and in `Results/`
+still name them, and the older raw files carry a `scene` key that the benchmark no longer prints.
+
 ## CMake build (2026-09-28)
 
 `CMakeLists.txt` adds CF as a subproject, and CF fetches SDL3, Box2D, Box3D and PhysFS. `CCute`
@@ -134,8 +143,9 @@ CMake did less than SwiftPM had done implicitly, and each gap was silent until c
 - **Windows.** Every configuration uses the release DLL C runtime, because Swift has no debug
   variant, and C and C++ are built with MSVC `cl`.
 - **swift-collections as a subproject.** It turns on shared libraries on Darwin and Windows unless
-  `BUILD_SHARED_LIBS` is already set, and every module joins `all`. The build sets
-  `BUILD_SHARED_LIBS OFF` and fetches it `EXCLUDE_FROM_ALL`.
+  `BUILD_SHARED_LIBS` is already set, and every module joins `all`. The build set
+  `BUILD_SHARED_LIBS OFF` and fetched it `EXCLUDE_FROM_ALL` until the benchmark variants that needed
+  it were removed.
 
 `xvfb-run` hung in `Scripts/linux-container.sh` whenever it became the container's PID 1, as the
 last command of `bash -c` does. It waits for a signal from Xvfb that never arrives there. The

@@ -33,8 +33,8 @@ sprite. Set `KANIA_EXIT_AFTER_FRAMES=N` to make any Kania game quit after N fram
 B=build/release/bin
 $B/HelloTriangle                                  # Swift port of CF's hello_triangle sample
 $B/SpriteBenchC --count 10000                     # C baseline
-$B/SpriteBench --count 10000 --impl raw-array     # Swift twin; --list-impls names the variants
-Scripts/bench.rb --impls overlay-span --runs 3    # C against chosen variants, Markdown table
+$B/SpriteBench --count 10000                      # Swift twin; --list-impls names the variants
+Scripts/bench.rb --runs 3                         # C against the Swift variants, Markdown table
 ```
 
 Both benchmarks print one JSON line: CPU time spent submitting draw commands (`submit_ms`),

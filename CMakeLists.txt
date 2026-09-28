@@ -15,8 +15,6 @@ project(Kania LANGUAGES C CXX Swift)
 option(KANIA_BUILD_SAMPLES "Build the samples and benchmarks" ${PROJECT_IS_TOP_LEVEL})
 option(KANIA_BUILD_TESTS "Build the tests" ${PROJECT_IS_TOP_LEVEL})
 option(KANIA_INDEX_STORE "Write the Swift index store that sourcekit-lsp reads" ${PROJECT_IS_TOP_LEVEL})
-set(KANIA_BENCH_SWIFT_FLAGS "" CACHE STRING
-  "Extra Swift flags for SpriteBench only, e.g. -enforce-exclusivity=unchecked")
 
 set(CMAKE_C_STANDARD 23)
 # CMake gives C the macOS deployment target but not Swift, which then targets the build machine's
@@ -109,15 +107,6 @@ if(KANIA_BUILD_TESTS)
 endif()
 
 if(KANIA_BUILD_SAMPLES)
-  include(FetchContent)
-  # swift-collections turns on shared libraries on Darwin and Windows unless told otherwise.
-  set(BUILD_SHARED_LIBS OFF)
-  FetchContent_Declare(SwiftCollections
-    GIT_REPOSITORY https://github.com/apple/swift-collections
-    GIT_TAG 98ef3c98609a1e31b7e157b5b619579001a789d6 # 1.7.1
-    EXCLUDE_FROM_ALL)
-  FetchContent_MakeAvailable(SwiftCollections)
-
   add_library(SpikeSupport STATIC Sources/SpikeSupport/Support.swift)
   target_include_directories(SpikeSupport INTERFACE ${CMAKE_Swift_MODULE_DIRECTORY})
   target_link_libraries(SpikeSupport PUBLIC CCute)
@@ -129,9 +118,7 @@ if(KANIA_BUILD_SAMPLES)
     Benchmarks/SpriteBench/main.swift
     Benchmarks/SpriteBench/Implementations.swift
     Benchmarks/SpriteBench/Workload.swift)
-  target_link_libraries(SpriteBench PRIVATE SpikeSupport BasicContainers)
-  separate_arguments(kania_bench_swift_flags NATIVE_COMMAND "${KANIA_BENCH_SWIFT_FLAGS}")
-  target_compile_options(SpriteBench PRIVATE ${kania_bench_swift_flags})
+  target_link_libraries(SpriteBench PRIVATE SpikeSupport)
 
   add_executable(SpriteBenchC Benchmarks/SpriteBenchC/main.c)
   target_link_libraries(SpriteBenchC PRIVATE CCute)
