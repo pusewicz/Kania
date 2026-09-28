@@ -25,6 +25,10 @@ Kania API tests. Beyond that, verification is a screenshot and the benchmark che
 `--count 1000 --frames 60`, whose JSON `checksum` fields must be equal. On Windows, configure from
 a Visual Studio developer prompt.
 
+sourcekit-lsp and clangd read `build/release/compile_commands.json` (set in
+`.sourcekit-lsp/config.json` and `.clangd`), so code intelligence, Serena's included, needs the
+release preset configured.
+
 ## How the pieces fit
 
 - **CMake builds everything.** `CMakeLists.txt` adds CF (the submodule) as a subproject, and CF
