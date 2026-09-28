@@ -14,6 +14,7 @@ project(Kania LANGUAGES C CXX Swift)
 
 option(KANIA_BUILD_SAMPLES "Build the samples and benchmarks" ${PROJECT_IS_TOP_LEVEL})
 option(KANIA_BUILD_TESTS "Build the tests" ${PROJECT_IS_TOP_LEVEL})
+option(KANIA_INDEX_STORE "Write the Swift index store that sourcekit-lsp reads" ${PROJECT_IS_TOP_LEVEL})
 set(KANIA_BENCH_SWIFT_FLAGS "" CACHE STRING
   "Extra Swift flags for SpriteBench only, e.g. -enforce-exclusivity=unchecked")
 
@@ -26,6 +27,10 @@ endif()
 set(CMAKE_Swift_LANGUAGE_VERSION 6)
 set(CMAKE_Swift_COMPILATION_MODE "$<IF:$<CONFIG:Debug>,incremental,wholemodule>")
 set(CMAKE_Swift_MODULE_DIRECTORY ${PROJECT_BINARY_DIR}/swift)
+# sourcekit-lsp does not index a compile-database project itself; it reads the store the build writes.
+if(KANIA_INDEX_STORE)
+  add_compile_options("$<$<COMPILE_LANGUAGE:Swift>:-index-store-path;${PROJECT_BINARY_DIR}/index/store>")
+endif()
 # Swift has no debug C runtime on Windows, so every configuration uses the release DLL runtime.
 set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
 if(PROJECT_IS_TOP_LEVEL)
