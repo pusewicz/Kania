@@ -13,7 +13,7 @@ public enum Draw {
   /// Queues `sprite`.
   public static func sprite(_ sprite: Sprite) {
     var sprite = sprite
-    sprite.drawInPlace()
+    sprite.draw()
   }
 
   /// Queues every sprite in `sprites`, in order.
@@ -24,7 +24,7 @@ public enum Draw {
   public static func sprites(_ sprites: inout [Sprite]) {
     var span = sprites.mutableSpan
     for index in span.indices {
-      unsafe span[unchecked: index].drawInPlace()
+      unsafe span[unchecked: index].draw()
     }
   }
 }

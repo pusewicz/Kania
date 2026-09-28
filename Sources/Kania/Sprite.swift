@@ -58,7 +58,7 @@ public struct Sprite {
   /// Queues the sprite, handing CF this value's own storage rather than a copy. `mutating` only so
   /// the pointer is to this value in place; CF reads the sprite and does not change it.
   @MainActor
-  mutating func drawInPlace() {
+  mutating func draw() {
     cf_draw_sprite(&raw)
   }
 }
