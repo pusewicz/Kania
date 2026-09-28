@@ -1,12 +1,24 @@
 // Swift side of the Phase 0 draw-path benchmark. Benchmarks/SpriteBenchC is the C twin;
 // both must run the same workload, so change them together.
 //
-// Usage: SpriteBench [--impl raw-array|raw-buffer|overlay-struct|overlay-span|overlay-class]
-//                    [--scene sprites|text] [--count N] [--frames N] [--warmup N] [--hidden 0|1]
-//                    [--screenshot path]
+// Usage: SpriteBench [--impl NAME] [--scene sprites|text] [--count N] [--frames N] [--warmup N]
+//                    [--hidden 0|1] [--screenshot path]
+//        SpriteBench --list-impls
 // Prints one JSON line with per-frame CPU submission and whole-frame times in milliseconds.
+// --list-impls prints the sprite implementations, one per line.
 import CCute
 import SpikeSupport
+
+/// The sprite implementations, in report order.
+let spriteImpls = [
+  "raw-array", "raw-buffer", "overlay-struct", "overlay-span", "overlay-inout", "overlay-unique",
+  "overlay-class",
+]
+
+if CommandLine.arguments.dropFirst().elementsEqual(["--list-impls"]) {
+  print(spriteImpls.joined(separator: "\n"))
+  exit(0)
+}
 
 let options = SpikeOptions(allowed: ["impl", "scene", "count", "frames", "warmup", "hidden", "screenshot"])
 let scene = options.string("scene", default: "sprites")
@@ -32,6 +44,8 @@ func makeWorkload(scene: String, impl: String, count: Int) -> any Workload {
   case ("sprites", "raw-buffer"): return RawBufferWorkload(count: count)
   case ("sprites", "overlay-struct"): return OverlayStructWorkload(count: count)
   case ("sprites", "overlay-span"): return OverlaySpanWorkload(count: count)
+  case ("sprites", "overlay-inout"): return OverlayInoutWorkload(count: count)
+  case ("sprites", "overlay-unique"): return OverlayUniqueWorkload(count: count)
   case ("sprites", "overlay-class"): return OverlayClassWorkload(count: count)
   default: fatalError("unknown scene/impl \(scene)/\(impl)")
   }

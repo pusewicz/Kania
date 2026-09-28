@@ -1,3 +1,4 @@
+import BasicContainers
 import CCute
 
 // MARK: Raw C import
@@ -185,6 +186,77 @@ final class OverlaySpanWorkload: Workload {
     for i in span.indices {
       span[i].step(bounds: bounds)
       span[i].sprite.draw()
+    }
+  }
+}
+
+/// The value-type overlay handed to a function that takes the array `inout`, the shape of a
+/// Kania API such as `draw(_ sprites: inout [Sprite])`, which indexes it per element.
+final class OverlayInoutWorkload: Workload {
+  private var entities: [Entity] = []
+  private let bounds = Vec2(width / 2, height / 2)
+
+  var checksum: Double {
+    entities.reduce(0) { $0 + Double($1.sprite.position.x) + Double($1.sprite.position.y) }
+  }
+
+  /// Creates `count` entities in the order the C benchmark does.
+  init(count: Int) {
+    entities.reserveCapacity(count)
+    makeEntities(count: count) { sprite, position, velocity in
+      var s = Sprite(sprite)
+      s.position = Vec2(position)
+      entities.append(Entity(sprite: s, velocity: Vec2(velocity)))
+    }
+  }
+
+  /// Passes the array to `stepEntities` for the whole frame.
+  func step(frame: Int) {
+    stepEntities(&entities, bounds: bounds)
+  }
+}
+
+/// Steps and draws every entity through the `inout` array's subscript. Never inlined, so it
+/// compiles the way an API in another module would.
+@inline(never)
+func stepEntities(_ entities: inout [Entity], bounds: Vec2) {
+  for i in entities.indices {
+    entities[i].step(bounds: bounds)
+    entities[i].sprite.draw()
+  }
+}
+
+/// The value-type overlay in a class-held `UniqueArray` from swift-collections, which has no
+/// copy-on-write checks. Each element access still checks exclusivity on the class property.
+/// The standard library's own `UniqueArray` needs macOS 27 / iOS 27; this one runs on Kania's
+/// minimum.
+final class OverlayUniqueWorkload: Workload {
+  private var entities: BasicContainers.UniqueArray<Entity>
+  private let bounds = Vec2(width / 2, height / 2)
+
+  var checksum: Double {
+    var sum: Double = 0
+    for i in entities.indices {
+      sum = sum + Double(entities[i].sprite.position.x) + Double(entities[i].sprite.position.y)
+    }
+    return sum
+  }
+
+  /// Creates `count` entities in the order the C benchmark does.
+  init(count: Int) {
+    entities = BasicContainers.UniqueArray(minimumCapacity: count)
+    makeEntities(count: count) { sprite, position, velocity in
+      var s = Sprite(sprite)
+      s.position = Vec2(position)
+      entities.append(Entity(sprite: s, velocity: Vec2(velocity)))
+    }
+  }
+
+  /// Steps and draws every entity through the array's subscript.
+  func step(frame: Int) {
+    for i in entities.indices {
+      entities[i].step(bounds: bounds)
+      entities[i].sprite.draw()
     }
   }
 }

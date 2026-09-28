@@ -73,6 +73,9 @@ let cfHeadersForSwift: [SwiftSetting] = [.unsafeFlags(["-Xcc", "-I\(prebuilt)/in
 let package = Package(
   name: "Kania",
   platforms: [.macOS(.v26), .iOS(.v26)],
+  dependencies: [
+    .package(url: "https://github.com/apple/swift-collections", from: "1.7.1")
+  ],
   targets: [
     .target(
       name: "CCute",
@@ -91,7 +94,9 @@ let package = Package(
       swiftSettings: cfHeadersForSwift),
     .executableTarget(
       name: "SpriteBench",
-      dependencies: ["CCute", "SpikeSupport"],
+      dependencies: [
+        "CCute", "SpikeSupport", .product(name: "BasicContainers", package: "swift-collections"),
+      ],
       path: "Benchmarks/SpriteBench",
       swiftSettings: cfHeadersForSwift + (benchSwiftFlags.isEmpty ? [] : [.unsafeFlags(benchSwiftFlags)])),
     .executableTarget(

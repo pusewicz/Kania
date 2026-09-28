@@ -6,7 +6,10 @@
 # Markdown table (also to --output when given) and writes every raw run to Results/raw/<label>.jsonl.
 #
 # Usage: Scripts/bench.rb [--label NAME] [--runs N] [--counts 100,1000,10000] [--frames N]
-#                         [--text-counts 100,1000] [--bin DIR] [--c-bin DIR] [--output FILE]
+#                         [--impls a,b] [--text-counts 100,1000] [--bin DIR] [--c-bin DIR]
+#                         [--output FILE]
+# --impls limits the Swift sprite implementations; C always runs as the baseline.
+# --text-counts '' skips the text scene.
 # Build first: swift build -c release (and any KANIA_BENCH_SWIFTFLAGS variant into --bin).
 
 require "json"
@@ -15,13 +18,13 @@ require "fileutils"
 require "rbconfig"
 
 ROOT = File.expand_path("..", __dir__)
-SWIFT_IMPLS = %w[raw-array raw-buffer overlay-struct overlay-span overlay-class].freeze
 
 options = {
   label: "local",
   runs: 5,
   counts: [100, 1_000, 10_000],
   text_counts: [100, 1_000],
+  impls: nil,
   frames: 600,
   bin: nil,
   c_bin: nil,
@@ -32,6 +35,7 @@ OptionParser.new do |o|
   o.on("--runs N", Integer) { |v| options[:runs] = v }
   o.on("--counts LIST") { |v| options[:counts] = v.split(",").map(&:to_i) }
   o.on("--text-counts LIST") { |v| options[:text_counts] = v.split(",").map(&:to_i) }
+  o.on("--impls LIST", "Swift sprite implementations to run") { |v| options[:impls] = v.split(",") }
   o.on("--frames N", Integer) { |v| options[:frames] = v }
   o.on("--bin DIR", "directory with SpriteBench") { |v| options[:bin] = v }
   o.on("--c-bin DIR", "directory with SpriteBenchC") { |v| options[:c_bin] = v }
@@ -42,6 +46,16 @@ bin = options[:bin] || `swift build -c release --show-bin-path`.strip
 c_bin = options[:c_bin] || bin
 exe = RbConfig::CONFIG["host_os"].match?(/mswin|mingw/) ? ".exe" : ""
 
+# SpriteBench names the sprite implementations it can run on this OS.
+listing = IO.popen([File.join(bin, "SpriteBench#{exe}"), "--list-impls"], &:read)
+abort "SpriteBench --list-impls failed:\n#{listing}" unless $?.success?
+swift_impls = listing.split
+if options[:impls]
+  unknown = options[:impls] - swift_impls
+  abort "unknown --impls #{unknown.join(", ")}; SpriteBench has #{swift_impls.join(", ")}" if unknown.any?
+  swift_impls &= options[:impls]
+end
+
 # Returns the parsed JSON line a single benchmark process prints, or aborts with its output.
 def run(command)
   output = IO.popen(command, err: %i[child out], &:read)
@@ -51,7 +65,7 @@ def run(command)
 end
 
 cases = options[:counts].flat_map do |count|
-  [["c", "sprites", count]] + SWIFT_IMPLS.map { |impl| [impl, "sprites", count] }
+  [["c", "sprites", count]] + swift_impls.map { |impl| [impl, "sprites", count] }
 end
 cases += options[:text_counts].flat_map { |count| [["c", "text", count], ["swift", "text", count]] }
 
@@ -88,6 +102,7 @@ table = [
   "| scene | count | impl | submit ms (median) | vs C | per item ns | frame ms (median) | checksum |",
   "|---|---:|---|---:|---:|---:|---:|---|"
 ]
+mismatches = []
 cases.each do |impl, scene, count|
   runs = results[[impl, scene, count]]
   submit = median(runs.map { |r| r.dig("submit_ms", "median") })
@@ -96,9 +111,11 @@ cases.each do |impl, scene, count|
   c_checksum = results[["c", scene, count]].first["checksum"]
   checksums = runs.map { |r| r["checksum"] }.uniq
   parity = checksums == [c_checksum] ? "matches C" : "DIFFERS #{checksums.inspect} vs #{c_checksum}"
+  mismatches << "#{impl} #{scene} #{count}" unless checksums == [c_checksum]
   table << format("| %s | %d | %s | %.4f | %+.1f%% | %.1f | %.3f | %s |", scene, count, impl, submit,
                   (submit / c_submit - 1) * 100, submit * 1e6 / count, frame, parity)
 end
 puts table
 File.write(options[:output], table.join("\n") + "\n") if options[:output]
 warn "raw runs: #{raw_path}"
+abort "checksums differ from C: #{mismatches.join(", ")}" if mismatches.any?

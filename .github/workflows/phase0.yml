@@ -5,8 +5,13 @@ on:
   pull_request:
   workflow_dispatch:
 
-# CI runners have no real GPU: Linux renders through lavapipe and Windows may not render at all,
-# so frame times here are informational. The submit_ms column (CPU only) is the comparable one.
+# CI runners have no real GPU: Linux renders through lavapipe and Windows has no GPU
+# either, so timings here mean nothing. The benchmark runs once, briefly, as a smoke test: every
+# variant must run and match the C checksum. Measure on real hardware (Benchmarks/CLAUDE.md).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   macos:
     runs-on: macos-26
@@ -34,7 +39,7 @@ jobs:
       - run: swift build -c release
       - run: swift format lint --strict --recursive Package.swift Sources Samples Benchmarks
       - run: .build/out/Products/Release/HelloTriangle --frames 30 --screenshot hello-macos.png
-      - run: Scripts/bench.rb --label ci-macos --runs 3 --frames 300 --output bench-macos.md
+      - run: Scripts/bench.rb --label ci-macos --runs 1 --frames 60 --output bench-macos.md
       - uses: actions/upload-artifact@v7
         with: { name: macos, path: "hello-macos.png\nbench-macos.md\nResults/raw/" }
 
@@ -72,7 +77,7 @@ jobs:
           export XDG_RUNTIME_DIR=/tmp/xdg; mkdir -p "$XDG_RUNTIME_DIR"; chmod 700 "$XDG_RUNTIME_DIR"
           B="$(swift build -c release --show-bin-path)"
           xvfb-run -a -s "-screen 0 1280x960x24" "$B/HelloTriangle" --frames 30 --screenshot hello-linux.png
-          xvfb-run -a -s "-screen 0 1280x960x24" Scripts/bench.rb --label ci-linux --runs 3 --frames 300 --output bench-linux.md
+          xvfb-run -a -s "-screen 0 1280x960x24" Scripts/bench.rb --label ci-linux --runs 1 --frames 60 --output bench-linux.md
       - uses: actions/upload-artifact@v7
         with: { name: linux, path: "hello-linux.png\nbench-linux.md\nResults/raw/" }
 
@@ -106,7 +111,7 @@ jobs:
           $bin = swift build -c release --show-bin-path
           & "$bin\HelloTriangle.exe" --frames 30 --screenshot hello-windows.png
           Write-Host "HelloTriangle exit=$LASTEXITCODE"
-          ruby Scripts/bench.rb --label ci-windows --runs 3 --frames 300 --output bench-windows.md
+          ruby Scripts/bench.rb --label ci-windows --runs 1 --frames 60 --output bench-windows.md
       - uses: actions/upload-artifact@v7
         if: always()
         with: { name: windows, path: "hello-windows.png\nbench-windows.md\nResults/raw/" }

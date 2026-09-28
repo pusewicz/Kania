@@ -8,7 +8,7 @@ Status as of 2026-09-28. Plan: [Kania Framework Plan](https://claude.ai/artifact
 |---|---|
 | Can Swift hold CF's draw performance? | **Yes, on the calling side.** Swift calling CF over raw memory is within ±5% of C at every sprite count. Idiomatic Swift that mutates a class-held `Array` element by element adds 9–21% to the CPU submission loop at 10k sprites and 20–35% at 1k. That is at most 0.15 ms per frame, and whole-frame time does not change. The cost is dynamic exclusivity checks, copy-on-write checks and ARC. The same code iterated through a `MutableSpan` is within 1–4% of C at 10k sprites; at 1k its bounds checks add about 11%, or 5 µs per frame. This measures Swift driving CF. Whether a Swift rewrite of CF's batching and flush matches C is phase 6's gate, and these findings are guidance for it. |
 | Is the web in Kania's first release? | **No, deferred** (owner decision, 2026-09-28). No Swift SDK targets Emscripten yet (checked the same day), and stage 1 runs on CF, which needs SDL3, which needs Emscripten in the browser. |
-| Does Swift + CF build and run on the desktop OSes? | macOS arm64: yes. Linux aarch64 (Ubuntu 24.04 container, Xvfb + lavapipe): yes, and `HelloTriangle` writes a PNG byte-identical to the macOS one. Linux x86_64 was not run locally. Windows: not verified with Swift 6.4, because GitHub Actions is blocked by account billing on the private repo. swift-game-spike's CI built Swift 6.3.3 + CF on `windows-2025` and ran a 30-frame smoke test that exited 0 (2026-09-10). |
+| Does Swift + CF build and run on the desktop OSes? | macOS arm64: yes. Linux aarch64 (Ubuntu 24.04 container, Xvfb + lavapipe): yes, and `HelloTriangle` writes a PNG byte-identical to the macOS one. Linux x86_64 was not run locally. Windows: not verified with Swift 6.4 during phase 0, because GitHub Actions was blocked by account billing on the private repo. Verified on the same day once the repository went public (CI on `windows-2025`): Swift 6.4 builds CF and the spike, and `HelloTriangle`'s PNG is byte-identical to the macOS one. |
 | Minimum Apple OS versions | macOS 26 and iOS 26 (owner decision, 2026-09-28). `Package.swift` and the CF build use them. |
 | CF commit Kania builds on | `e4786898` (2026-09-20) plus Kania patches on the `kania` branch of pusewicz/cute_framework: `778f78c6` limits `-msse4.1` to x86 so aarch64 Linux builds. |
 
@@ -72,7 +72,7 @@ Where the overhead comes from, from the disassembly of each loop and the flag va
 
 ## Not done
 
-- Windows with Swift 6.4, and CI on all three OSes: blocked until Actions billing is fixed or the repository is public. `.github/workflows/phase0.yml` is ready.
+- Windows with Swift 6.4, and CI on all three OSes: done the same day, after phase 0 closed, once the repository went public.
 - The x86 branch of the `-msse4.1` CMake patch: only aarch64 Linux was built.
 - Debugger quality on Linux and Windows.
 - Frame pacing beyond medians and p95.

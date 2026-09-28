@@ -14,7 +14,7 @@ installed with swiftly).
 Scripts/build-cf.sh                  # CMake-build static CF for this triple; rerun after any change under Vendor/
 swift build -c release               # all targets; binaries land in $(swift build -c release --show-bin-path)
 swift format lint --strict --recursive Package.swift Sources Samples Benchmarks
-Scripts/bench.rb --label local       # benchmark matrix; --runs 3 --frames 300 for a quick pass
+Scripts/bench.rb --impls a,b --runs 3 --frames 300  # focused comparison; rules in Benchmarks/CLAUDE.md
 Scripts/linux-container.sh           # Linux (native arch) build + HelloTriangle + benchmark in Docker, Xvfb + lavapipe
 ```
 
@@ -35,21 +35,10 @@ There is no test target yet. Verification is a screenshot and the benchmark chec
   as `cf_v2` (use `CF_V2(x:y:)`), and mutable C globals under Swift 6. The shim wraps the binding
   macros, CF's `extern` time globals and `stderr`. Glibc's `stderr` compiles on macOS but fails on
   Linux, so anything touching libc globals goes through the shim.
-- **`Benchmarks/SpriteBenchC` and `Benchmarks/SpriteBench` are twins.** Both must do the same
-  work: same LCG, same entity order, same bounce rule, same CLI and JSON output. Change them
-  together. The C twin is built with `-O3` (CF's CMake Release level; SwiftPM's release default
-  for C is `-Os`) and `-ffp-contract=off`, because clang fuses `a + b * c` into an FMA and Swift
-  never does; without it the checksums differ in the last bits.
-- **Swift variants** (`--impl`) live in `Implementations.swift`: `raw-array`, `raw-buffer`,
-  `overlay-struct`, `overlay-span`, `overlay-class`. `KANIA_BENCH_SWIFTFLAGS` adds compiler flags
-  to `SpriteBench` only; build such variants with their own `--scratch-path` and pass the result to
-  `bench.rb --bin`.
-- **Benchmarks run a visible window**: macOS throttles hidden windows to the display refresh. CF has
-  no GPU command buffer between `cf_app_draw_onto_screen` and the next `cf_app_update`, so
-  `writeScreenshot` must follow an update and draw.
-- **`Scripts/bench.rb`** starts a fresh process per run, interleaves implementations round-robin,
-  prints a Markdown table (`--output FILE` also writes it), and appends raw runs to
-  `Results/raw/<label>.jsonl`. Differences under about 4% between batches are noise.
+- **The draw-path benchmarks** (`Benchmarks/SpriteBench`, its C twin `Benchmarks/SpriteBenchC`,
+  and `Scripts/bench.rb`) have their own rules in `Benchmarks/CLAUDE.md`.
+- **Screenshots:** CF has no GPU command buffer between `cf_app_draw_onto_screen` and the next
+  `cf_app_update`, so `writeScreenshot` must follow an update and a draw.
 
 ## CF changes
 
@@ -82,5 +71,8 @@ rules are kept. Record phase decisions and findings in the repo too, in `PHASE<n
 ## CI
 
 `.github/workflows/phase0.yml` builds and runs on macOS 26, Linux (Swift container, lavapipe) and
-Windows (MSVC-built CF). GitHub Actions is currently blocked by account billing, so Linux is
-verified locally with `Scripts/linux-container.sh` and Windows is unverified with Swift 6.4.
+Windows (MSVC-built CF) on every push; the repository is public, so Actions costs nothing. A newer
+push to the same branch cancels the run in progress. The benchmark step there is a one-run smoke
+test: runners have no GPU, so CI timings mean nothing, but every variant must run and match C's
+checksum. The Windows benchmark step is `continue-on-error` until CF's texture assert at 10k
+sprites is fixed (`PHASE1.md`). `Scripts/linux-container.sh` reproduces the Linux job locally.

@@ -3,8 +3,9 @@
 A Swift 2D game framework that starts on [Cute Framework](https://github.com/RandyGaul/cute_framework)
 (CF) and replaces it piece by piece, until only SDL3, Box2D and Dear ImGui remain in C.
 
-This repository is at **Phase 0**: a spike that checks Swift can drive CF without losing draw
-performance, before any Kania API exists. Findings are in [`PHASE0.md`](PHASE0.md).
+Phase 0, a spike that checked Swift can drive CF without losing draw performance, is done; its
+findings are in [`PHASE0.md`](PHASE0.md). Phase 1 builds Kania's Swift API over CF; its decisions
+and results are in [`PHASE1.md`](PHASE1.md). No Kania API exists yet.
 
 ## Build
 
@@ -25,8 +26,8 @@ swift build -c release
 B=$(swift build -c release --show-bin-path)
 $B/HelloTriangle                                  # Swift port of CF's hello_triangle sample
 $B/SpriteBenchC --count 10000                     # C baseline
-$B/SpriteBench --count 10000 --impl raw-array     # Swift twin; see --impl in its main.swift
-Scripts/bench.rb --label local                    # full matrix, Markdown table on stdout
+$B/SpriteBench --count 10000 --impl raw-array     # Swift twin; --list-impls names the variants
+Scripts/bench.rb --impls overlay-span --runs 3    # C against chosen variants, Markdown table
 ```
 
 Both benchmarks print one JSON line: CPU time spent submitting draw commands (`submit_ms`),
@@ -41,7 +42,7 @@ Sources/CCute/           C shim over CF for Swift (wraps _Generic macros and ext
 Sources/SpikeSupport/    option parsing, timing summaries, PNG screenshots
 Samples/HelloTriangle/   low-level graphics API from Swift
 Benchmarks/SpriteBench*/ draw-path benchmark, C and Swift twins
-Scripts/bench.rb         runs the benchmark matrix
+Scripts/bench.rb         runs the benchmark matrix (Benchmarks/CLAUDE.md has the rules)
 Scripts/linux-container.sh  builds and benchmarks in the Swift Linux image (Xvfb + lavapipe)
 Results/                 benchmark tables per platform
 ```

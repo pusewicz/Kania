@@ -14,7 +14,8 @@ deferred to the phases that later rewrite each subsystem.
 | Isolation | **`@MainActor`.** SDL3 wants windowing and events on the main thread, and CF's state is global. The public API is annotated explicitly rather than through a module-wide default-isolation flag, so the isolation shows in the interface whatever the build system. |
 | GPU and audio handles | **`~Copyable` owners plus `Hashable` IDs.** `Texture`, `Canvas`, `Shader`, `Mesh`, `Material`, `Audio` and the other types CF makes you destroy are `~Copyable` structs whose `deinit` queues the destroy. Each has a copyable, `Hashable` `ID` for dictionary keys and non-owning references. Types with nothing to destroy (`Sprite`, `Color`, vectors, transforms) stay copyable. |
 | Errors | **Typed `throws`** in place of `CF_Result`. Swift 6.4's typed-throwing `Task` initializers carry the same error type across `async` code. |
-| Draw path | **Value-type sprites, mutated in place.** The API is expected to take `inout [Sprite]` and iterate through `mutableSpan` inside. That is pending the benchmark below. |
+| Draw path | **Value-type sprites, `inout [Sprite]` in the signature, `mutableSpan` inside.** Measured below: a span loop is within 4–6% of C, indexing the `inout` array directly costs 9–10%, and a class-held `UniqueArray` 13–20%. |
+| Minimum Apple versions | **Stay at macOS 26 and iOS 26.** The standard library's `UniqueArray` needs macOS 27 / iOS 27. Where Kania needs a noncopyable-capable array, it uses swift-collections' `BasicContainers.UniqueArray`, a stable module that runs on macOS 26 and builds with CMake. |
 
 ## What the decisions imply
 
@@ -40,10 +41,49 @@ deferred to the phases that later rewrite each subsystem.
 - **CF can still hold a dangling id.** A material stores its textures' raw ids inside CF, so Swift
   cannot stop a material from outliving a texture it uses.
 
+## Draw-path benchmark (2026-09-28)
+
+Phase 0 measured iteration through `MutableSpan` but not an `inout` array parameter. `SpriteBench`
+gained two variants:
+
+- `overlay-inout` passes the array `inout` to a non-inlined function that indexes it, as a Kania API
+  in another module would.
+- `overlay-unique` stores the sprites in a class-held `BasicContainers.UniqueArray`, which has no
+  copy-on-write checks.
+
+The C twin did not change. Every checksum matches C. The numbers are from macOS arm64 (Apple M3
+Max, Swift 6.4, `-O`): the median of 3 interleaved runs of 300 frames each, all in one batch
+(`Results/macos-arm64-phase1.md`).
+
+| count | impl | submit ms | vs C | runtime calls per sprite |
+|---:|---|---:|---:|---|
+| 1000 | c | 0.0493 | | |
+| 1000 | overlay-span | 0.0521 | +5.7% | none |
+| 1000 | overlay-inout | 0.0544 | +10.3% | none |
+| 1000 | overlay-unique | 0.0590 | +19.7% | `swift_beginAccess` + `swift_endAccess` |
+| 10000 | c | 0.5087 | | |
+| 10000 | overlay-span | 0.5276 | +3.7% | none |
+| 10000 | overlay-inout | 0.5545 | +9.0% | none |
+| 10000 | overlay-unique | 0.5743 | +12.9% | `swift_beginAccess` + `swift_endAccess` |
+
+- **An `inout` parameter removes the runtime calls but not all the overhead.** The disassembly
+  shows the uniqueness check hoisted out of the loop, with no exclusivity checks inside it. After
+  each call into C, though, the loop writes the buffer pointer back, reloads the count and
+  re-checks bounds. That is because the C call is opaque, so the compiler can't assume the array
+  is unchanged. A span's base and count are fixed for the whole loop, so none of that repeats.
+- **`UniqueArray` in a class trades copy-on-write checks for exclusivity checks.** Each element
+  access still goes through `swift_beginAccess` on the class property, so it lands between
+  phase 0's `overlay-struct` and the span. Iterated through its own `mutableSpan` it would match
+  `overlay-span`, so it gives the draw path nothing that `Array` plus `mutableSpan` doesn't.
+- **So Kania's batch APIs take `inout [Sprite]`, which is familiar and needs no new types, and
+  iterate through `mutableSpan` inside.** Game code that loops over its own sprites gets the same
+  advice in the docs.
+
 ## Open
 
-- **`inout [Sprite]` against the alternatives.** Phase 0 measured iteration through `MutableSpan`
-  (within 1–4% of C at 10k sprites), not an `inout Array` parameter. `SpriteBench` gets two more
-  variants, an `inout [Sprite]` parameter and Swift 6.4's `UniqueArray`, which has no copy-on-write
-  checks. The C twin does not change.
 - **3D scope** (draw 3D, models, Box3D). This decides the size of the "remaining subsystems" task.
+- **Windows benchmark crash.** On the Windows CI runner, which has no GPU, `SpriteBench` at 10k
+  sprites stopped at `CF_ASSERT(tex)` in `cute_graphics_sdlgpu.cpp:612`:
+  `SDL_CreateGPUTexture` returned NULL during `cf_app_draw_onto_screen`. It happened on the fifth
+  10k run, and the four before it, C included, passed. The step is `continue-on-error`, so the job
+  still passed. The CI task stays open until the step runs without that flag.
