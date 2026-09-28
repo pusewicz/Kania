@@ -40,7 +40,8 @@ a Visual Studio developer prompt.
   - Swift 6 language mode and whole-module optimization in Release.
   - A Swift `-target` carrying the macOS deployment target (26.0); without it swiftc targets the
     build machine's OS.
-  - The MSVC release DLL runtime on Windows.
+  - The MSVC release DLL runtime on Windows, and the `lib` prefix on Swift static libraries there,
+    which is the name their modules autolink.
   - Linux `-pthread` handling: SDL3 and s2n link with it, and swiftc rejects it.
   - `swiftc` from `PATH`, set in the presets. Otherwise CMake on macOS asks `xcrun` and gets the
     Command Line Tools' Swift, not the swiftly toolchain.
@@ -112,4 +113,6 @@ every push; the repository is public, so Actions costs nothing. A newer
 push to the same branch cancels the run in progress. The benchmark step there is a one-run smoke
 test: runners have no GPU, so CI timings mean nothing, but every variant must run and match C's
 checksum. The Windows benchmark step is `continue-on-error` until CF's texture assert at 10k
-sprites is fixed (`PHASE1.md`). `Scripts/linux-container.sh` reproduces the Linux job locally.
+sprites is fixed (`PHASE1.md`). The Windows job sets up MSVC before Swift and runs nothing from
+Git's bash: otherwise swiftc finds Git's `link` before MSVC's when creating static libraries.
+`Scripts/linux-container.sh` reproduces the Linux job locally.

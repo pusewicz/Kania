@@ -82,8 +82,6 @@ jobs:
 
   windows:
     runs-on: windows-2025
-    # Windows is not a phase 1 target yet: its CMake build fails, and its result does not fail the run.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v7
         with: { submodules: true }
@@ -95,22 +93,14 @@ jobs:
         with:
           swift-version: swift-6.4.0-release
           swift-build: 6.4.0-RELEASE
-      - name: Which link, cl and lld-link come first (temporary)
-        shell: pwsh
-        run: Get-Command -All -ErrorAction SilentlyContinue link, cl, lld-link | Format-Table -AutoSize Name, Source
       - run: cmake --preset release
       - run: cmake --build --preset release
-      - name: Tests (not yet expected to pass on Windows)
-        continue-on-error: true
-        run: ctest --test-dir build/release --output-on-failure
-      - name: Hello triangle and benchmark (no GPU on the runner)
-        shell: pwsh
+      - run: ctest --test-dir build/release --output-on-failure
+      - run: build\release\bin\HelloTriangle.exe --frames 30 --screenshot hello-windows.png
+      - name: Benchmark (no GPU on the runner)
         # CF asserts creating a texture at 10k sprites on this runner; see PHASE1.md.
         continue-on-error: true
-        run: |
-          build\release\bin\HelloTriangle.exe --frames 30 --screenshot hello-windows.png
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          ruby Scripts/bench.rb --label ci-windows --runs 1 --frames 60 --output bench-windows.md
+        run: ruby Scripts/bench.rb --label ci-windows --runs 1 --frames 60 --output bench-windows.md
       - name: Example game against this checkout
         # Not bash: Git's bash.exe puts its /usr/bin, and its link, ahead of MSVC's.
         shell: pwsh
