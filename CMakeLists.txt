@@ -33,6 +33,9 @@ if(KANIA_INDEX_STORE)
 endif()
 # Swift has no debug C runtime on Windows, so every configuration uses the release DLL runtime.
 set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
+# On Windows a module built into a static library autolinks lib<name>.lib, but CMake names Windows
+# static libraries <name>.lib.
+set(CMAKE_STATIC_LIBRARY_PREFIX_Swift lib)
 if(PROJECT_IS_TOP_LEVEL)
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 endif()

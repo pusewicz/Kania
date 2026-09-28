@@ -82,36 +82,35 @@ jobs:
 
   windows:
     runs-on: windows-2025
-    # Windows is not a phase 1 target yet: its CMake build fails, and its result does not fail the run.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v7
         with: { submodules: true }
+      # MSVC first: gha-setup-swift moves the whole PATH into GITHUB_PATH, which the runner puts
+      # ahead of the Path a later action exports. MSVC's link.exe would then come after Git's
+      # coreutils link, which swiftc runs to create static libraries.
+      - uses: ilammy/msvc-dev-cmd@v1
       - uses: compnerd/gha-setup-swift@v0.5.0
         with:
           swift-version: swift-6.4.0-release
           swift-build: 6.4.0-RELEASE
-      - uses: ilammy/msvc-dev-cmd@v1
       - run: cmake --preset release
       - run: cmake --build --preset release
-      - name: Tests (not yet expected to pass on Windows)
-        continue-on-error: true
-        run: ctest --test-dir build/release --output-on-failure
-      - name: Hello triangle and benchmark (no GPU on the runner)
-        shell: pwsh
+      - run: ctest --test-dir build/release --output-on-failure
+      - run: build\release\bin\HelloTriangle.exe --frames 30 --screenshot hello-windows.png
+      - name: Benchmark (no GPU on the runner)
         # CF asserts creating a texture at 10k sprites on this runner; see PHASE1.md.
         continue-on-error: true
-        run: |
-          build\release\bin\HelloTriangle.exe --frames 30 --screenshot hello-windows.png
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          ruby Scripts/bench.rb --label ci-windows --runs 1 --frames 60 --output bench-windows.md
+        run: ruby Scripts/bench.rb --label ci-windows --runs 1 --frames 60 --output bench-windows.md
       - name: Example game against this checkout
-        shell: bash
+        # Not bash: Git's bash.exe puts its /usr/bin, and its link, ahead of MSVC's.
+        shell: pwsh
         run: |
-          cmake -S Examples/MinimalGame -B build/example -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DFETCHCONTENT_SOURCE_DIR_KANIA="$GITHUB_WORKSPACE"
+          $PSNativeCommandUseErrorActionPreference = $true
+          cmake -S Examples/MinimalGame -B build/example -G Ninja -DCMAKE_BUILD_TYPE=Release `
+            -DFETCHCONTENT_SOURCE_DIR_KANIA="$env:GITHUB_WORKSPACE"
           cmake --build build/example
-          KANIA_EXIT_AFTER_FRAMES=30 build/example/MinimalGame.exe
+          $env:KANIA_EXIT_AFTER_FRAMES = 30
+          build\example\MinimalGame.exe
       - uses: actions/upload-artifact@v7
         if: always()
         with: { name: windows, path: "hello-windows.png\nbench-windows.md\nResults/raw/ci-windows.jsonl" }

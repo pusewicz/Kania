@@ -132,7 +132,8 @@ CMake did less than SwiftPM had done implicitly, and each gap was silent until c
   `-pthread`, which swiftc rejects. Swift links hand it to clang with `-Xclang-linker` instead.
   Kania creates `Threads::Threads` before CF so it can adjust it.
 - **Windows.** Every configuration uses the release DLL C runtime, because Swift has no debug
-  variant, and C and C++ are built with MSVC `cl`.
+  variant, and C and C++ are built with MSVC `cl`. Swift static libraries are named
+  `lib<name>.lib`, the name their modules autolink (see Windows CI below).
 - **swift-collections as a subproject.** It turns on shared libraries on Darwin and Windows unless
   `BUILD_SHARED_LIBS` is already set, and every module joins `all`. The build sets
   `BUILD_SHARED_LIBS OFF` and fetches it `EXCLUDE_FROM_ALL`.
@@ -175,9 +176,9 @@ process's real `main`. It checks that every frame runs on SDL's main thread and 
 `Task { @MainActor in }` started in frame 0 has run before frame 1's update. It passes on macOS, 20
 runs out of 20, where Kania calls no drain at all, so the Cocoa run loop does drain the main queue.
 It passes on Linux under Xvfb. With the Linux drain removed, it fails with "a main-actor task started in
-frame 0 had not run by frame 1", so the test is what catches a missing drain. Windows is not run
-yet. Swift Testing is not set up either; it comes with the Kania API tests (`p1-tests`), since the
-loop can't run inside a test runner.
+frame 0 had not run by frame 1", so the test is what catches a missing drain. It passes on the
+Windows CI runner too. Swift Testing is not set up yet; it comes with the Kania API tests
+(`p1-tests`), since the loop can't run inside a test runner.
 
 
 ## Canvas and readback (2026-09-28)
@@ -194,7 +195,7 @@ checks. `Color` (Float components) and `Pixel` (8-bit components) are the first 
   mid-frame therefore copies the canvas as it was before the frame. So `readPixels()` returns a
   `Readback` that Kania starts after present, and the game checks it in later frames.
 
-`Tests/Canvas` checks three things, and passes on macOS and on Linux:
+`Tests/Canvas` checks three things, and passes on macOS, Linux and Windows:
 - A canvas cleared to red reads back as red.
 - A canvas released mid-frame is still in the queue during that frame and is destroyed by the next.
 - A 0-by-8 canvas throws.
@@ -221,7 +222,7 @@ at a time, with no copies and no bounds checks.
 size of the window, then reads it back. It checks that every sprite drew inside the box its
 position predicts, and that nothing was drawn anywhere else. That pins down the coordinates: the
 origin is the centre of the window, y points up, and readback rows run from the top. With the
-opposite row order assumed, the test fails. It passes on macOS and Linux.
+opposite row order assumed, the test fails. It passes on macOS, Linux and Windows.
 
 `Examples/MinimalGame` now animates the demo sprite. `KANIA_EXIT_AFTER_FRAMES=N` makes any Kania
 game quit after N frames, so CI runs the example for 30 frames instead of only building it.
@@ -231,11 +232,36 @@ zero-cost and interoperates with the standard library, but long operator express
 been slow to type-check. `Draw` is a namespace of static functions, rather than methods such as
 `sprite.draw()`.
 
+## Windows CI (2026-09-28)
+
+The Windows job had never built. Two faults stacked up. SDL's CI, which builds only C, meets
+neither, because CMake calls `cl` and `link` by absolute path and only swiftc looks `link` up
+itself.
+
+- **Git's `link` ahead of MSVC's.** swiftc creates a static library by running `link /LIB`, and
+  it takes the first `link.exe` on `PATH`. gha-setup-swift moves the whole `PATH` into
+  `GITHUB_PATH`, which the runner puts ahead of the `Path` that msvc-dev-cmd exports after it. So
+  Git's coreutils `link` came first and failed with "extra operand". The job now sets up MSVC
+  before Swift, and runs nothing from Git's bash, which also puts its `/usr/bin` first. A developer
+  whose `PATH` has Git's `usr\bin` ahead of MSVC hits the same failure. `-use-ld=lld` would make
+  swiftc use the toolchain's own `lld-link`, but CMake has no static-library flag for Swift alone:
+  `CMAKE_STATIC_LINKER_FLAGS` also reaches `lib.exe` for the C libraries.
+- **The `lib` prefix.** On MSVC targets, a module compiled with `-static` autolinks
+  `/DEFAULTLIB:lib<name>.lib`, while CMake names Windows static libraries `<name>.lib`. Every
+  executable failed with LNK1104. The build sets `CMAKE_STATIC_LIBRARY_PREFIX_Swift` to `lib`.
+
+The build, the `ctest` tests, `HelloTriangle` and `MinimalGame` now pass on the runner, and the
+job counts toward the run's result. The benchmark passes at 100 and 1,000 sprites and still stops
+at 10k (see Open). Worth taking from SDL's CI later: its tests run under `sdlprocdump`, which writes
+a minidump when a test crashes, and failed jobs upload the dumps.
+
 ## Open
 
 - **3D scope** (draw 3D, models, Box3D). This decides the size of the "remaining subsystems" task.
-- **Windows benchmark crash.** On the Windows CI runner, which has no GPU, `SpriteBench` at 10k
-  sprites stopped at `CF_ASSERT(tex)` in `cute_graphics_sdlgpu.cpp:612`:
-  `SDL_CreateGPUTexture` returned NULL during `cf_app_draw_onto_screen`. It happened on the fifth
-  10k run, and the four before it, C included, passed. The step is `continue-on-error`, so the job
-  still passed. The CI task stays open until the step runs without that flag.
+- **Windows benchmark crash.** On the Windows CI runner, which has no GPU, the benchmark at 10k
+  sprites stops at `CF_ASSERT(tex)` in `cute_graphics_sdlgpu.cpp:612`: `SDL_CreateGPUTexture`
+  returned NULL during `cf_app_draw_onto_screen`. The first time, it stopped `SpriteBench` on the
+  fifth 10k run, after four had passed, C included. Since the Windows build was fixed, it stops
+  `SpriteBenchC`, the first 10k run, so the fault is in CF or SDL on this device, not in Kania.
+  CF asserts without logging `SDL_GetError()`, so logging it is the next step. The step is
+  `continue-on-error`, and the CI task stays open until it runs without that flag.
