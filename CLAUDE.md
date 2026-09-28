@@ -58,11 +58,18 @@ a Visual Studio developer prompt.
 - **Screenshots:** CF has no GPU command buffer between `cf_app_draw_onto_screen` and the next
   `cf_app_update`, so `writeScreenshot` must follow an update and a draw.
 
+## Workflow
+
+Changes reach `main` only through pull requests; branch protection enforces it. Work on a branch,
+push it, open the PR with `gh pr create`, and stop there: the owner reviews and merges, with a merge
+commit. Merged branches are deleted automatically. The `macos` and `linux` CI jobs must pass; the
+Windows job doesn't block yet.
+
 ## CF changes
 
-CF is frozen at a pinned commit. Kania's patches go on the `kania` branch of the submodule
-(pusewicz/cute_framework). Push that branch before pushing a Kania commit that moves the
-submodule pointer, or clones break.
+CF is pinned at a commit on the `kania` branch of the submodule (pusewicz/cute_framework): upstream
+master plus Kania's patches. Push that branch before opening a Kania PR that moves the submodule
+pointer, or clones break.
 
 ## Plan and progress
 
@@ -74,8 +81,9 @@ and per-phase checklists render live from the artifact's database; only editors 
 
 Keep it current as part of finishing work, with the `ArtifactData` tool (one `batch` per update):
 
-- A task is done: `update` it with `done: true`, `done_on` (YYYY-MM-DD) and `ref` (short commit
-  SHA, PR number, or a one-word reason such as `deferred`).
+- A task is done: `update` it with `done: true`, `done_on` (YYYY-MM-DD) and `ref` (the PR number
+  such as `#12`, a short commit SHA, or a one-word reason such as `deferred`). Mark it when opening
+  the PR that finishes it; if that PR closes unmerged, reopen the task.
 - Work starts on a phase: set its `status` to `active` and `started`. Its gate passes: `done` and
   `finished`.
 - Scope grows: add a task with the next `order` in its phase. Scope shrinks: delete the task
