@@ -17,6 +17,7 @@ final class RawArrayWorkload: Workload {
     entities.reduce(0) { $0 + Double($1.sprite.transform.p.x) + Double($1.sprite.transform.p.y) }
   }
 
+  /// Creates `count` entities in the order the C benchmark does.
   init(count: Int) {
     entities.reserveCapacity(count)
     makeEntities(count: count) { sprite, position, velocity in
@@ -26,6 +27,7 @@ final class RawArrayWorkload: Workload {
     }
   }
 
+  /// Moves, animates and draws every sprite, indexing the array per field.
   func step(frame: Int) {
     for i in entities.indices {
       let p = cf_add_v2(entities[i].sprite.transform.p, cf_mul_v2_f(entities[i].velocity, fixedDelta))
@@ -46,6 +48,7 @@ final class RawBufferWorkload: Workload {
     entities.reduce(0) { $0 + Double($1.sprite.transform.p.x) + Double($1.sprite.transform.p.y) }
   }
 
+  /// Allocates and initialises `count` entities in the order the C benchmark does.
   init(count: Int) {
     entities = .allocate(capacity: count)
     var i = 0
@@ -62,6 +65,7 @@ final class RawBufferWorkload: Workload {
     entities.deallocate()
   }
 
+  /// Moves, animates and draws every sprite through raw pointers.
   func step(frame: Int) {
     for i in entities.indices {
       let e = entities.baseAddress! + i
@@ -81,7 +85,9 @@ final class RawBufferWorkload: Workload {
 typealias Vec2 = SIMD2<Float>
 
 extension Vec2 {
+  /// Converts CF's vector type.
   init(_ v: CF_V2) { self.init(v.x, v.y) }
+  /// The vector as CF's type.
   var cf: CF_V2 { CF_V2(x: x, y: y) }
 }
 
@@ -89,17 +95,22 @@ extension Vec2 {
 struct Sprite {
   private var raw: CF_Sprite
 
+  /// Wraps a sprite created by CF.
   init(_ raw: CF_Sprite) { self.raw = raw }
 
+  /// The sprite's translation, stored in its CF transform.
   var position: Vec2 {
     get { Vec2(raw.transform.p) }
     set { raw.transform.p = newValue.cf }
   }
 
+  /// Starts `animation` from its first frame.
   mutating func play(_ animation: String) { cf_sprite_play(&raw, animation) }
 
+  /// Advances the animation by the app's frame delta.
   mutating func update() { cf_sprite_update(&raw) }
 
+  /// Queues the sprite with CF's draw API.
   func draw() {
     withUnsafePointer(to: raw) { cf_draw_sprite($0) }
   }
@@ -110,6 +121,7 @@ struct Entity {
   var sprite: Sprite
   var velocity: Vec2
 
+  /// Moves one fixed step, bounces off `bounds` (half extents) and advances the animation.
   mutating func step(bounds: Vec2) {
     let p = sprite.position + velocity * fixedDelta
     if abs(p.x) > bounds.x { velocity.x = -velocity.x }
@@ -128,6 +140,7 @@ final class OverlayStructWorkload: Workload {
     entities.reduce(0) { $0 + Double($1.sprite.position.x) + Double($1.sprite.position.y) }
   }
 
+  /// Creates `count` entities in the order the C benchmark does.
   init(count: Int) {
     entities.reserveCapacity(count)
     makeEntities(count: count) { sprite, position, velocity in
@@ -137,6 +150,7 @@ final class OverlayStructWorkload: Workload {
     }
   }
 
+  /// Steps and draws every entity through the array's subscript.
   func step(frame: Int) {
     for i in entities.indices {
       entities[i].step(bounds: bounds)
@@ -156,6 +170,7 @@ final class OverlaySpanWorkload: Workload {
     entities.reduce(0) { $0 + Double($1.sprite.position.x) + Double($1.sprite.position.y) }
   }
 
+  /// Creates `count` entities in the order the C benchmark does.
   init(count: Int) {
     entities.reserveCapacity(count)
     makeEntities(count: count) { sprite, position, velocity in
@@ -165,6 +180,7 @@ final class OverlaySpanWorkload: Workload {
     }
   }
 
+  /// Steps and draws every entity through one mutable span over the array.
   func step(frame: Int) {
     var span = entities.mutableSpan
     for i in span.indices {
@@ -179,11 +195,13 @@ final class SpriteNode {
   var sprite: Sprite
   var velocity: Vec2
 
+  /// Creates a node that owns `sprite` and moves at `velocity`.
   init(sprite: Sprite, velocity: Vec2) {
     self.sprite = sprite
     self.velocity = velocity
   }
 
+  /// Moves one fixed step, bounces off `bounds` (half extents) and advances the animation.
   func step(bounds: Vec2) {
     let p = sprite.position + velocity * fixedDelta
     if abs(p.x) > bounds.x { velocity.x = -velocity.x }
@@ -202,6 +220,7 @@ final class OverlayClassWorkload: Workload {
     nodes.reduce(0) { $0 + Double($1.sprite.position.x) + Double($1.sprite.position.y) }
   }
 
+  /// Creates `count` nodes in the order the C benchmark does.
   init(count: Int) {
     nodes.reserveCapacity(count)
     makeEntities(count: count) { sprite, position, velocity in
@@ -211,6 +230,7 @@ final class OverlayClassWorkload: Workload {
     }
   }
 
+  /// Steps and draws every node, retaining each while it is used.
   func step(frame: Int) {
     for node in nodes {
       node.step(bounds: bounds)
@@ -227,8 +247,10 @@ final class TextWorkload: Workload {
 
   var checksum: Double { 0 }
 
+  /// Creates a workload that draws `count` labels per frame.
   init(count: Int) { self.count = count }
 
+  /// Builds and draws every label for `frame`.
   func step(frame: Int) {
     let columns = 16
     for i in 0..<count {

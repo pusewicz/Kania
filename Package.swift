@@ -98,8 +98,9 @@ let package = Package(
       name: "SpriteBenchC",
       dependencies: ["CCute"],
       path: "Benchmarks/SpriteBenchC",
+      // -O3 matches CF's CMake Release build; SwiftPM's release default for C is -Os.
       // Swift never fuses a * b + c into an FMA; clang does by default. Match Swift so the
       // position checksums of both benchmarks agree bit for bit.
-      cSettings: cfHeaders + [.unsafeFlags(["-ffp-contract=off"])]),
+      cSettings: cfHeaders + [.unsafeFlags(["-O3", "-ffp-contract=off"])]),
   ]
 )

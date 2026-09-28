@@ -62,6 +62,7 @@ public struct Summary {
     "{\"median\":\(format(median)),\"p95\":\(format(p95)),\"mean\":\(format(mean))}"
   }
 
+  /// Rounds `value` to four decimals for the JSON output.
   private func format(_ value: Double) -> String {
     let scaled = (value * 10_000).rounded() / 10_000
     return String(scaled)

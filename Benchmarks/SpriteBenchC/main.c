@@ -40,11 +40,13 @@ static float rng_next(void)
 	return (float)(s_rng >> 8) / 16777216.0f;
 }
 
+/* Next random value in [lo, hi). */
 static float rng_range(float lo, float hi)
 {
 	return lo + (hi - lo) * rng_next();
 }
 
+/* Parses `--name value` pairs, exiting on an unknown option. */
 static Options parse_options(int argc, char* argv[])
 {
 	Options o = { "sprites", 10000, 600, 60, NULL, false };
@@ -60,6 +62,7 @@ static Options parse_options(int argc, char* argv[])
 	return o;
 }
 
+/* Fills `entities` with demo sprites, positions and velocities in the order the Swift benchmark uses. */
 static void make_entities(Entity* entities, int count)
 {
 	CF_Sprite demo = cf_make_demo_sprite();
@@ -77,6 +80,7 @@ static void make_entities(Entity* entities, int count)
 	}
 }
 
+/* Moves one fixed step, bounces off the window edges, advances the animation and draws each sprite. */
 static void step_sprites(Entity* entities, int count)
 {
 	for (int i = 0; i < count; ++i) {
@@ -90,6 +94,7 @@ static void step_sprites(Entity* entities, int count)
 	}
 }
 
+/* Formats and draws `count` labels in a grid. */
 static void draw_labels(int count, int frame)
 {
 	char buf[64];
@@ -110,12 +115,14 @@ static double position_checksum(const Entity* entities, int count)
 	return sum;
 }
 
+/* qsort comparator for ascending doubles. */
 static int compare_doubles(const void* a, const void* b)
 {
 	double x = *(const double*)a, y = *(const double*)b;
 	return (x > y) - (x < y);
 }
 
+/* Prints `"name":{median,p95,mean}` for `samples`, sorting them in place. */
 static void print_stats(const char* name, double* samples, int n)
 {
 	double sum = 0;
@@ -125,6 +132,7 @@ static void print_stats(const char* name, double* samples, int n)
 	printf("\"%s\":{\"median\":%.4f,\"p95\":%.4f,\"mean\":%.4f}", name, samples[(n - 1) / 2], samples[p95], sum / n);
 }
 
+/* Renders the queued draw commands into an offscreen canvas and writes it to `path` as a PNG. */
 static void write_screenshot(const char* path)
 {
 	CF_Canvas canvas = cf_make_canvas(cf_canvas_defaults(WIDTH, HEIGHT));
@@ -146,6 +154,7 @@ static void write_screenshot(const char* path)
 	cf_destroy_canvas(canvas);
 }
 
+/* Runs the warmup and measured frames and prints one JSON line of results. */
 int main(int argc, char* argv[])
 {
 	Options o = parse_options(argc, argv);

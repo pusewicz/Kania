@@ -25,6 +25,7 @@ struct Random {
 /// A per-frame workload. `step(frame:)` submits one frame of draw commands and nothing else,
 /// because it is the only part of the frame the benchmark attributes to the implementation.
 protocol Workload: AnyObject {
+  /// Submits frame `frame`'s draw commands.
   func step(frame: Int)
 
   /// Sum of all sprite positions, compared against the C benchmark to prove equal work.
