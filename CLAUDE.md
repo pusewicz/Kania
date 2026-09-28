@@ -48,6 +48,10 @@ a Visual Studio developer prompt.
   queue, so Kania does after each frame; `Tests/AppLoop` fails without it. Only events that
   arrive on the main thread reach CF, whose event queue is not thread-safe. `PHASE1.md` has the
   details.
+- **GPU objects are `~Copyable` owners.** Their `deinit` only queues the CF id (`DestroyQueue`,
+  `Mutex`-guarded, because a `deinit` can run on any thread); the app loop destroys queued objects
+  after present. Readbacks also start after present, because CF copies on its own command buffer,
+  submitted at once, while the frame's drawing reaches the GPU only at present.
 - **`Sources/CCute` is the only C shim.** Swift drops C11 `_Generic` macros, variadic macros such
   as `cf_v2` (use `CF_V2(x:y:)`), and mutable C globals under Swift 6. The shim wraps the binding
   macros, CF's `extern` time globals and `stderr`. Glibc's `stderr` compiles on macOS but fails on

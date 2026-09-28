@@ -28,8 +28,12 @@ deferred to the phases that later rewrite each subsystem.
   below.
 - **`~Copyable` handles spread to whatever stores them.** A struct that stores a `Texture` must itself
   be `~Copyable`, and `Array`, `Set` and `Dictionary` can't hold them. The `ID` types, and borrow
-  accessors such as `canvas.texture`, keep that out of ordinary game code. Handles are also
-  `~Sendable` (SE-0518, Swift 6.4), so they cannot leave the main actor, and their `deinit` runs there.
+  accessors such as `canvas.texture`, keep that out of ordinary game code. `Game` itself allows
+  `~Copyable` types, so a game can own a handle in a stored property.
+- **A handle's `deinit` can run on any thread.** A value that isn't `Sendable` can still be sent to
+  another isolation domain when nothing else refers to it, so `~Sendable` does not pin it to the main
+  actor. `deinit` therefore only records the CF id in a `Mutex`-guarded queue, and the main thread
+  destroys what it holds after the frame is presented.
 - **CF can still hold a dangling id.** A material stores its textures' raw ids inside CF, so Swift
   cannot stop a material from outliving a texture it uses.
 
@@ -175,6 +179,33 @@ frame 0 had not run by frame 1", so the test is what catches a missing drain. Wi
 yet. Swift Testing is not set up either; it comes with the Kania API tests (`p1-tests`), since the
 loop can't run inside a test runner.
 
+
+## Canvas and readback (2026-09-28)
+
+`Canvas` is the first GPU handle. It is `~Copyable`, with a copyable `Canvas.ID: Hashable`. It has a
+clear colour, `Draw.render(to:)` renders the frame's queued drawing into it, and `readPixels()`
+reads it back. It came before `Texture` because reading pixels back is what every later drawing test
+checks. `Color` (Float components) and `Pixel` (8-bit components) are the first colour types.
+
+- **The destroy queue.** When a canvas's owner goes away, its `deinit` queues the id. The app loop
+  destroys queued objects after present, and again at shutdown before `cf_destroy_app`.
+- **Readbacks start after present.** CF copies a canvas back on its own GPU command buffer and
+  submits it at once, while the frame's drawing reaches the GPU only at present. A readback started
+  mid-frame therefore copies the canvas as it was before the frame. So `readPixels()` returns a
+  `Readback` that Kania starts after present, and the game checks it in later frames.
+
+`Tests/Canvas` checks three things, and passes on macOS and on Linux:
+- A canvas cleared to red reads back as red.
+- A canvas released mid-frame is still in the queue during that frame and is destroyed by the next.
+- A 0-by-8 canvas throws.
+
+Both negative controls fail as they should. Without the drain after present, the released canvas is
+still waiting in frame 1. With readbacks started before present, the pixels come back magenta (CF's
+fill for a texture nothing has drawn into) instead of red.
+
+To review: `Readback` is a class the game polls, because a copy spans frames and a `~Copyable`
+canvas can't be captured by a `Task`; an `async` form can sit on top of it later. Pixel row order is
+not documented yet, because a solid colour can't show it; the sprite tests will.
 
 ## Open
 

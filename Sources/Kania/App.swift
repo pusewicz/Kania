@@ -15,7 +15,7 @@ public enum App {
   ///
   /// SDL owns the frame loop: it calls back once to start, once per frame, for each event, and once
   /// to stop. The start, frame and stop callbacks run on the main thread, which is the main actor.
-  static func run<G: Game>(_ game: G.Type) -> Int32 {
+  static func run<G: Game & ~Copyable>(_ game: G.Type) -> Int32 {
     runner = Runner(window: G.window) { () throws(KaniaError) -> any FrameHandler in
       try GameHandler(game: G())
     }
@@ -52,11 +52,11 @@ protocol FrameHandler: AnyObject {
 
 /// Holds a game and runs its frames.
 @MainActor
-final class GameHandler<G: Game>: FrameHandler {
+final class GameHandler<G: Game & ~Copyable>: FrameHandler {
   private var game: G
 
   /// Holds `game`.
-  init(game: G) {
+  init(game: consuming G) {
     self.game = game
   }
 
@@ -97,20 +97,26 @@ final class Runner {
     return SDL_APP_CONTINUE
   }
 
-  /// Runs one frame, then any main-actor jobs it queued.
+  /// Runs one frame, then finishes what has to wait until it is presented: starting readbacks,
+  /// destroying released GPU objects and running the main-actor jobs the frame queued.
   func iterate() -> SDL_AppResult {
     cf_app_update(nil)
     game?.frame()
     cf_app_draw_onto_screen(true)
+    Readback.afterPresent()
+    DestroyQueue.drain()
     #if !canImport(Darwin)
       cfs_drain_main_queue()
     #endif
     return cf_app_is_running() ? SDL_APP_CONTINUE : SDL_APP_SUCCESS
   }
 
-  /// Releases the game, then CF. The game goes first so its resources are freed while CF exists.
+  /// Releases the game, then CF. The game goes first, and the GPU objects it released are
+  /// destroyed, while CF still exists.
   func stop() {
     game = nil
+    Readback.cancelAll()
+    DestroyQueue.drain()
     cf_destroy_app()
   }
 
