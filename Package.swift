@@ -72,7 +72,7 @@ let cfHeadersForSwift: [SwiftSetting] = [.unsafeFlags(["-Xcc", "-I\(prebuilt)/in
 
 let package = Package(
   name: "Kania",
-  platforms: [.macOS(.v14)],
+  platforms: [.macOS(.v26), .iOS(.v26)],
   targets: [
     .target(
       name: "CCute",

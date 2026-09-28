@@ -24,16 +24,14 @@ let result = cf_make_app(
 guard !cf_is_error(result) else { fatalError("cf_make_app failed") }
 let immediate = cf_app_set_present_mode(CF_PRESENT_MODE_IMMEDIATE)
 
-/// Creates the workload for `scene` and `impl`, exiting on an unknown or unavailable pair.
+/// Creates the workload for `scene` and `impl`, exiting on an unknown pair.
 func makeWorkload(scene: String, impl: String, count: Int) -> any Workload {
   switch (scene, impl) {
   case ("text", _): return TextWorkload(count: count)
   case ("sprites", "raw-array"): return RawArrayWorkload(count: count)
   case ("sprites", "raw-buffer"): return RawBufferWorkload(count: count)
   case ("sprites", "overlay-struct"): return OverlayStructWorkload(count: count)
-  case ("sprites", "overlay-span"):
-    guard #available(macOS 26, iOS 26, *) else { fatalError("overlay-span needs Array.mutableSpan") }
-    return OverlaySpanWorkload(count: count)
+  case ("sprites", "overlay-span"): return OverlaySpanWorkload(count: count)
   case ("sprites", "overlay-class"): return OverlayClassWorkload(count: count)
   default: fatalError("unknown scene/impl \(scene)/\(impl)")
   }

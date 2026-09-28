@@ -161,7 +161,6 @@ final class OverlayStructWorkload: Workload {
 
 /// The value-type overlay iterated through a `MutableSpan`: one exclusive access to the array
 /// for the whole loop instead of one per element, with bounds checks kept.
-@available(macOS 26, iOS 26, *)
 final class OverlaySpanWorkload: Workload {
   private var entities: [Entity] = []
   private let bounds = Vec2(width / 2, height / 2)

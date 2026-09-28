@@ -27,7 +27,7 @@ COMPILER_ARGS=()
 case "$TRIPLE" in *windows-msvc) COMPILER_ARGS=(-DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl) ;; esac
 
 PLATFORM_ARGS=()
-[ "$(uname -s)" = Darwin ] && PLATFORM_ARGS=(-DCMAKE_OSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-14.0}")
+[ "$(uname -s)" = Darwin ] && PLATFORM_ARGS=(-DCMAKE_OSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-26.0}")
 
 echo "== configuring CF for $TRIPLE"
 cmake -S "$SRC" -B "$BUILD" -G Ninja \

@@ -9,7 +9,7 @@ on:
 # so frame times here are informational. The submit_ms column (CPU only) is the comparable one.
 jobs:
   macos:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
         with: { submodules: true }
