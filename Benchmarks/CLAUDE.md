@@ -19,13 +19,9 @@ reading are in `PHASE0.md` and `PHASE1.md`, and the tables are in `Results/`.
   `bench.rb` gets the list from `SpriteBench --list-impls`, so it needs no change. A variant that
   needs a newer OS than Kania's minimum is gated with `#available` and left out of `spriteImpls`
   where it can't run.
-- **Use swift-collections' `UniqueArray`, not the standard library's.** The standard library's
-  needs macOS 27 / iOS 27, above Kania's minimum; `BasicContainers.UniqueArray` runs on macOS 26.
-  Both are in scope, so qualify the name.
-- **Compiler-flag variants** go through the `KANIA_BENCH_SWIFT_FLAGS` cache variable, which reaches
-  `SpriteBench` only. Configure each variant in its own build directory, for example
-  `cmake --preset release -B build/noexcl -DKANIA_BENCH_SWIFT_FLAGS=-enforce-exclusivity=unchecked`,
-  and pass its `bin/` to `bench.rb --bin`.
+- **Delete a variant once its question is answered.** The finding goes in `PHASE<n>.md` and the
+  code stays in git history. The benchmark keeps only the floor (`raw-buffer`) and the shape Kania
+  ships, so CI's smoke test runs what matters.
 
 ## Measuring
 
@@ -41,8 +37,7 @@ reading are in `PHASE0.md` and `PHASE1.md`, and the tables are in `Results/`.
 - **Compare within one batch.** C varied by up to 4% between batches in phase 0, so differences
   smaller than that across batches are noise.
 - **Run only what the question needs.** `--impls a,b` limits the Swift variants (C always runs
-  as the baseline), `--counts` the sprite counts, and `--text-counts ''` skips the text scene. With
-  `--runs 3 --frames 300`, comparing three variants at 1k and 10k sprites takes about 90 seconds.
-  Run the full matrix (5 runs of 600 frames, every variant, about 30 cases) only for a record
-  that replaces a whole results table.
+  as the baseline) and `--counts` the sprite counts. With `--runs 3 --frames 300`, comparing three
+  variants at 1k and 10k sprites takes about 90 seconds. Run the full matrix (5 runs of 600
+  frames, every variant, every count) only for a record that replaces a whole results table.
 - **Quick parity check:** `--count 1000 --frames 60` on both binaries, then compare `checksum`.

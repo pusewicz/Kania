@@ -1,17 +1,14 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Runs the Phase 0 draw-path benchmark matrix: the C baseline and every Swift variant at each
-# sprite count, interleaved round-robin so thermal drift hits all of them equally. Prints a
-# Markdown table (also to --output when given) and writes every raw run to Results/raw/<label>.jsonl.
+# Runs the draw-path benchmark matrix: the C baseline and every Swift variant at each sprite count,
+# interleaved round-robin so thermal drift hits all of them equally. Prints a Markdown table (also
+# to --output when given) and writes every raw run to Results/raw/<label>.jsonl.
 #
 # Usage: Scripts/bench.rb [--label NAME] [--runs N] [--counts 100,1000,10000] [--frames N]
-#                         [--impls a,b] [--text-counts 100,1000] [--bin DIR] [--c-bin DIR]
-#                         [--output FILE]
-# --impls limits the Swift sprite implementations; C always runs as the baseline.
-# --text-counts '' skips the text scene.
-# Build first: cmake --preset release && cmake --build --preset release. For a compiler-flag variant,
-# configure another build directory with -DKANIA_BENCH_SWIFT_FLAGS=... and pass its bin/ as --bin.
+#                         [--impls a,b] [--bin DIR] [--c-bin DIR] [--output FILE]
+# --impls limits the Swift implementations; C always runs as the baseline.
+# Build first: cmake --preset release && cmake --build --preset release.
 
 require "json"
 require "optparse"
@@ -24,7 +21,6 @@ options = {
   label: "local",
   runs: 5,
   counts: [100, 1_000, 10_000],
-  text_counts: [100, 1_000],
   impls: nil,
   frames: 600,
   bin: nil,
@@ -35,22 +31,20 @@ OptionParser.new do |o|
   o.on("--label NAME") { |v| options[:label] = v }
   o.on("--runs N", Integer) { |v| options[:runs] = v }
   o.on("--counts LIST") { |v| options[:counts] = v.split(",").map(&:to_i) }
-  o.on("--text-counts LIST") { |v| options[:text_counts] = v.split(",").map(&:to_i) }
-  o.on("--impls LIST", "Swift sprite implementations to run") { |v| options[:impls] = v.split(",") }
+  o.on("--impls LIST", "Swift implementations to run") { |v| options[:impls] = v.split(",") }
   o.on("--frames N", Integer) { |v| options[:frames] = v }
   o.on("--bin DIR", "directory with SpriteBench") { |v| options[:bin] = v }
   o.on("--c-bin DIR", "directory with SpriteBenchC") { |v| options[:c_bin] = v }
   o.on("--output FILE", "also write the table here") { |v| options[:output] = v }
 end.parse!
 abort "unexpected arguments: #{ARGV.join(" ")}" unless ARGV.empty?
-counts = options[:counts] + options[:text_counts]
-abort "counts must be positive: #{counts.join(", ")}" unless counts.all?(&:positive?)
+abort "counts must be positive: #{options[:counts].join(", ")}" unless options[:counts].all?(&:positive?)
 
 bin = options[:bin] || File.join(ROOT, "build/release/bin")
 c_bin = options[:c_bin] || bin
 exe = RbConfig::CONFIG["host_os"].match?(/mswin|mingw/) ? ".exe" : ""
 
-# SpriteBench names the sprite implementations it can run on this OS.
+# SpriteBench names the implementations it can run on this OS.
 sprite_bench = File.join(bin, "SpriteBench#{exe}")
 abort "#{sprite_bench} not found; build first (see the top of this script)" unless File.exist?(sprite_bench)
 listing = IO.popen([sprite_bench, "--list-impls"], &:read)
@@ -70,30 +64,26 @@ def run(command)
   JSON.parse(line)
 end
 
-cases = options[:counts].flat_map do |count|
-  [["c", "sprites", count]] + swift_impls.map { |impl| [impl, "sprites", count] }
-end
-cases += options[:text_counts].flat_map { |count| [["c", "text", count], ["swift", "text", count]] }
+cases = options[:counts].flat_map { |count| (["c"] + swift_impls).map { |impl| [impl, count] } }
 
 FileUtils.mkdir_p(File.join(ROOT, "Results/raw"))
 raw_path = File.join(ROOT, "Results/raw/#{options[:label]}.jsonl")
 results = Hash.new { |h, k| h[k] = [] }
 File.open(raw_path, "w") do |raw|
   options[:runs].times do |round|
-    cases.each do |impl, scene, count|
-      common = ["--scene", scene, "--count", count.to_s, "--frames", options[:frames].to_s]
+    cases.each do |impl, count|
+      common = ["--count", count.to_s, "--frames", options[:frames].to_s]
       command =
         if impl == "c"
           [File.join(c_bin, "SpriteBenchC#{exe}"), *common]
         else
-          [File.join(bin, "SpriteBench#{exe}"), *common, *(scene == "sprites" ? ["--impl", impl] : [])]
+          [File.join(bin, "SpriteBench#{exe}"), *common, "--impl", impl]
         end
       result = run(command)
       result["round"] = round
       raw.puts(JSON.generate(result))
-      results[[impl, scene, count]] << result
-      warn format("round %d  %-15s %-7s %6d  submit %.4f ms", round, impl, scene, count,
-                  result.dig("submit_ms", "median"))
+      results[[impl, count]] << result
+      warn format("round %d  %-22s %6d  submit %.4f ms", round, impl, count, result.dig("submit_ms", "median"))
     end
   end
 end
@@ -105,20 +95,20 @@ def median(values)
 end
 
 table = [
-  "| scene | count | impl | submit ms (median) | vs C | per item ns | frame ms (median) | checksum |",
-  "|---|---:|---|---:|---:|---:|---:|---|"
+  "| count | impl | submit ms (median) | vs C | per item ns | frame ms (median) | checksum |",
+  "|---:|---|---:|---:|---:|---:|---|"
 ]
 mismatches = []
-cases.each do |impl, scene, count|
-  runs = results[[impl, scene, count]]
+cases.each do |impl, count|
+  runs = results[[impl, count]]
   submit = median(runs.map { |r| r.dig("submit_ms", "median") })
   frame = median(runs.map { |r| r.dig("frame_ms", "median") })
-  c_submit = median(results[["c", scene, count]].map { |r| r.dig("submit_ms", "median") })
-  c_checksum = results[["c", scene, count]].first["checksum"]
+  c_submit = median(results[["c", count]].map { |r| r.dig("submit_ms", "median") })
+  c_checksum = results[["c", count]].first["checksum"]
   checksums = runs.map { |r| r["checksum"] }.uniq
   parity = checksums == [c_checksum] ? "matches C" : "DIFFERS #{checksums.inspect} vs #{c_checksum}"
-  mismatches << "#{impl} #{scene} #{count}" unless checksums == [c_checksum]
-  table << format("| %s | %d | %s | %.4f | %+.1f%% | %.1f | %.3f | %s |", scene, count, impl, submit,
+  mismatches << "#{impl} #{count}" unless checksums == [c_checksum]
+  table << format("| %d | %s | %.4f | %+.1f%% | %.1f | %.3f | %s |", count, impl, submit,
                   (submit / c_submit - 1) * 100, submit * 1e6 / count, frame, parity)
 end
 puts table

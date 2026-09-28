@@ -1,8 +1,7 @@
-// C baseline for the Phase 0 draw-path benchmark. Benchmarks/SpriteBench is the Swift twin;
+// C baseline for the draw-path benchmark. Benchmarks/SpriteBench is the Swift twin;
 // both must run the same workload, so change them together.
 //
-// Usage: SpriteBenchC [--scene sprites|text] [--count N] [--frames N] [--warmup N] [--hidden 0|1]
-//                     [--screenshot path]
+// Usage: SpriteBenchC [--count N] [--frames N] [--warmup N] [--hidden 0|1] [--screenshot path]
 // Prints one JSON line with per-frame CPU submission and whole-frame times in milliseconds.
 #include <CCute.h>
 #include <stdio.h>
@@ -21,7 +20,6 @@ typedef struct Entity
 
 typedef struct Options
 {
-	const char* scene;
 	int count;
 	int frames;
 	int warmup;
@@ -49,10 +47,9 @@ static float rng_range(float lo, float hi)
 /* Parses `--name value` pairs, exiting on an unknown option. */
 static Options parse_options(int argc, char* argv[])
 {
-	Options o = { "sprites", 10000, 600, 60, NULL, false };
+	Options o = { 10000, 600, 60, NULL, false };
 	for (int i = 1; i + 1 < argc; i += 2) {
-		if (!strcmp(argv[i], "--scene")) o.scene = argv[i + 1];
-		else if (!strcmp(argv[i], "--count")) o.count = atoi(argv[i + 1]);
+		if (!strcmp(argv[i], "--count")) o.count = atoi(argv[i + 1]);
 		else if (!strcmp(argv[i], "--frames")) o.frames = atoi(argv[i + 1]);
 		else if (!strcmp(argv[i], "--warmup")) o.warmup = atoi(argv[i + 1]);
 		else if (!strcmp(argv[i], "--screenshot")) o.screenshot = argv[i + 1];
@@ -91,19 +88,6 @@ static void step_sprites(Entity* entities, int count)
 		e->sprite.transform.p = p;
 		cf_sprite_update(&e->sprite);
 		cf_draw_sprite(&e->sprite);
-	}
-}
-
-/* Formats and draws `count` labels in a grid. */
-static void draw_labels(int count, int frame)
-{
-	char buf[64];
-	int columns = 16;
-	for (int i = 0; i < count; ++i) {
-		snprintf(buf, sizeof(buf), "Entity %d hp %d", i, (frame + i) % 100);
-		float x = -WIDTH / 2 + 8 + (float)(i % columns) * (WIDTH / columns);
-		float y = HEIGHT / 2 - 16 - (float)((i / columns) % 44) * 16;
-		cf_draw_text(buf, cf_v2(x, y), -1);
 	}
 }
 
@@ -158,13 +142,12 @@ static void write_screenshot(const char* path)
 int main(int argc, char* argv[])
 {
 	Options o = parse_options(argc, argv);
-	bool sprites = !strcmp(o.scene, "sprites");
 	CF_Result result = cf_make_app("SpriteBenchC", 0, 0, 0, WIDTH, HEIGHT, CF_APP_OPTIONS_WINDOW_POS_CENTERED_BIT | (o.hidden ? CF_APP_OPTIONS_HIDDEN_BIT : 0), argv[0]);
 	if (cf_is_error(result)) return 1;
 	bool immediate = cf_app_set_present_mode(CF_PRESENT_MODE_IMMEDIATE);
 
-	Entity* entities = sprites ? (Entity*)calloc((size_t)o.count, sizeof(Entity)) : NULL;
-	if (sprites) make_entities(entities, o.count);
+	Entity* entities = (Entity*)calloc((size_t)o.count, sizeof(Entity));
+	make_entities(entities, o.count);
 	double* submit_ms = (double*)malloc(sizeof(double) * (size_t)o.frames);
 	double* frame_ms = (double*)malloc(sizeof(double) * (size_t)o.frames);
 	double freq = (double)cf_get_tick_frequency();
@@ -173,8 +156,7 @@ int main(int argc, char* argv[])
 		uint64_t t0 = cf_get_ticks();
 		cf_app_update(NULL);
 		uint64_t t1 = cf_get_ticks();
-		if (sprites) step_sprites(entities, o.count);
-		else draw_labels(o.count, f);
+		step_sprites(entities, o.count);
 		uint64_t t2 = cf_get_ticks();
 		cf_app_draw_onto_screen(true);
 		uint64_t t3 = cf_get_ticks();
@@ -185,13 +167,12 @@ int main(int argc, char* argv[])
 	}
 	if (o.screenshot) {
 		cf_app_update(NULL);
-		if (sprites) step_sprites(entities, o.count);
-		else draw_labels(o.count, 0);
+		step_sprites(entities, o.count);
 		write_screenshot(o.screenshot);
 	}
 
-	double checksum = sprites ? position_checksum(entities, o.count) : 0;
-	printf("{\"impl\":\"c\",\"scene\":\"%s\",\"count\":%d,\"frames\":%d,\"immediate\":%s,\"checksum\":%.3f,", o.scene, o.count, o.frames, immediate ? "true" : "false", checksum);
+	double checksum = position_checksum(entities, o.count);
+	printf("{\"impl\":\"c\",\"count\":%d,\"frames\":%d,\"immediate\":%s,\"checksum\":%.3f,", o.count, o.frames, immediate ? "true" : "false", checksum);
 	print_stats("submit_ms", submit_ms, o.frames);
 	printf(",");
 	print_stats("frame_ms", frame_ms, o.frames);

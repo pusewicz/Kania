@@ -1,8 +1,8 @@
-// Swift side of the Phase 0 draw-path benchmark. Benchmarks/SpriteBenchC is the C twin;
+// Swift side of the draw-path benchmark. Benchmarks/SpriteBenchC is the C twin;
 // both must run the same workload, so change them together.
 //
-// Usage: SpriteBench [--impl NAME] [--scene sprites|text] [--count N] [--frames N] [--warmup N]
-//                    [--hidden 0|1] [--screenshot path]
+// Usage: SpriteBench [--impl NAME] [--count N] [--frames N] [--warmup N] [--hidden 0|1]
+//                    [--screenshot path]
 //        SpriteBench --list-impls
 // Prints one JSON line with per-frame CPU submission and whole-frame times in milliseconds.
 // --list-impls prints the sprite implementations, one per line.
@@ -10,19 +10,15 @@ import CCute
 import SpikeSupport
 
 /// The sprite implementations, in report order.
-let spriteImpls = [
-  "raw-array", "raw-buffer", "overlay-struct", "overlay-span", "overlay-span-inplace", "overlay-inout",
-  "overlay-unique", "overlay-class",
-]
+let spriteImpls = ["raw-buffer", "overlay-span-inplace"]
 
 if CommandLine.arguments.dropFirst().elementsEqual(["--list-impls"]) {
   print(spriteImpls.joined(separator: "\n"))
   exit(0)
 }
 
-let options = SpikeOptions(allowed: ["impl", "scene", "count", "frames", "warmup", "hidden", "screenshot"])
-let scene = options.string("scene", default: "sprites")
-let impl = scene == "text" ? "swift" : options.string("impl", default: "raw-array")
+let options = SpikeOptions(allowed: ["impl", "count", "frames", "warmup", "hidden", "screenshot"])
+let impl = options.string("impl", default: "overlay-span-inplace")
 let count = options.int("count", default: 10_000)
 let frames = options.int("frames", default: 600)
 let warmup = options.int("warmup", default: 60)
@@ -36,23 +32,16 @@ let result = cf_make_app(
 guard !cf_is_error(result) else { fatalError("cf_make_app failed") }
 let immediate = cf_app_set_present_mode(CF_PRESENT_MODE_IMMEDIATE)
 
-/// Creates the workload for `scene` and `impl`, exiting on an unknown pair.
-func makeWorkload(scene: String, impl: String, count: Int) -> any Workload {
-  switch (scene, impl) {
-  case ("text", _): return TextWorkload(count: count)
-  case ("sprites", "raw-array"): return RawArrayWorkload(count: count)
-  case ("sprites", "raw-buffer"): return RawBufferWorkload(count: count)
-  case ("sprites", "overlay-struct"): return OverlayStructWorkload(count: count)
-  case ("sprites", "overlay-span"): return OverlaySpanWorkload(count: count)
-  case ("sprites", "overlay-span-inplace"): return OverlaySpanInPlaceWorkload(count: count)
-  case ("sprites", "overlay-inout"): return OverlayInoutWorkload(count: count)
-  case ("sprites", "overlay-unique"): return OverlayUniqueWorkload(count: count)
-  case ("sprites", "overlay-class"): return OverlayClassWorkload(count: count)
-  default: fatalError("unknown scene/impl \(scene)/\(impl)")
+/// Creates the workload for `impl`, exiting on an unknown name.
+func makeWorkload(impl: String, count: Int) -> any Workload {
+  switch impl {
+  case "raw-buffer": return RawBufferWorkload(count: count)
+  case "overlay-span-inplace": return OverlaySpanInPlaceWorkload(count: count)
+  default: fatalError("unknown impl \(impl)")
   }
 }
 
-let workload = makeWorkload(scene: scene, impl: impl, count: count)
+let workload = makeWorkload(impl: impl, count: count)
 
 var submit: [Double] = []
 var whole: [Double] = []
@@ -80,7 +69,7 @@ if let path = options.optionalString("screenshot") {
 }
 
 print(
-  "{\"impl\":\"\(impl)\",\"scene\":\"\(scene)\",\"count\":\(count),\"frames\":\(frames),"
+  "{\"impl\":\"\(impl)\",\"count\":\(count),\"frames\":\(frames),"
     + "\"immediate\":\(immediate),\"checksum\":\(String(format3: workload.checksum)),"
     + "\"submit_ms\":\(Summary(submit).json),\"frame_ms\":\(Summary(whole).json)}")
 cf_destroy_app()
