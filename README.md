@@ -11,19 +11,25 @@ and results are in [`PHASE1.md`](PHASE1.md). No Kania API exists yet.
 
 Requirements: [swiftly](https://www.swift.org/install/) (toolchain pinned in `.swift-version`),
 CMake >= 4.2, Ninja and Ruby. Linux also needs SDL3's X11/Wayland/audio development packages
-(see `.github/workflows/phase0.yml`); Windows needs Visual Studio Build Tools.
+(see `.github/workflows/ci.yml`). Windows needs Visual Studio Build Tools; configure from a
+developer prompt.
 
 ```sh
 git clone --recurse-submodules <this repo>
 cd Kania
-Scripts/build-cf.sh            # builds CF once per target triple into Vendor/prebuilt/<triple>/
-swift build -c release
+cmake --preset release         # CF, SDL3, Box2D and PhysFS build as subprojects
+cmake --build --preset release # executables land in build/release/bin
 ```
+
+## Use it in a game
+
+A game is a CMake project that pulls Kania in with `FetchContent`;
+[`Examples/MinimalGame`](Examples/MinimalGame/CMakeLists.txt) is the smallest one.
 
 ## Run
 
 ```sh
-B=$(swift build -c release --show-bin-path)
+B=build/release/bin
 $B/HelloTriangle                                  # Swift port of CF's hello_triangle sample
 $B/SpriteBenchC --count 10000                     # C baseline
 $B/SpriteBench --count 10000 --impl raw-array     # Swift twin; --list-impls names the variants
@@ -37,8 +43,10 @@ whole-frame time (`frame_ms`), and a position checksum that must match between C
 
 ```
 Vendor/cute_framework/   CF, pinned (submodule of pusewicz/cute_framework)
-Scripts/build-cf.sh      CMake build of static CF + collected headers and link line
+CMakeLists.txt           builds CF as a subproject, then Kania, samples and benchmarks
 Sources/CCute/           C shim over CF for Swift (wraps _Generic macros and extern globals)
+Sources/Kania/           the Kania library (the API starts in phase 1)
+Examples/MinimalGame/    a game project consuming Kania with FetchContent
 Sources/SpikeSupport/    option parsing, timing summaries, PNG screenshots
 Samples/HelloTriangle/   low-level graphics API from Swift
 Benchmarks/SpriteBench*/ draw-path benchmark, C and Swift twins

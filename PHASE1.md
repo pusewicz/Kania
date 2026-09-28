@@ -10,7 +10,7 @@ deferred to the phases that later rewrite each subsystem.
 
 | Question | Decision |
 |---|---|
-| How games consume Kania | **CMake.** Kania is a CMake project that builds CF as a subproject and Kania's Swift targets with CMake's Swift support. Games are CMake projects that pull Kania in with `FetchContent`. `Package.swift`, `Scripts/build-cf.sh` and the `unsafeFlags` link line go once CMake builds CF, the samples and the benchmarks. SwiftPM support may come back later as its own task. |
+| How games consume Kania | **CMake.** Kania is a CMake project that builds CF as a subproject and Kania's Swift targets with CMake's Swift support. Games are CMake projects that pull Kania in with `FetchContent`. `Package.swift`, `Scripts/build-cf.sh` and the `unsafeFlags` link line are gone (see *CMake build* below). SwiftPM support may come back later as its own task. |
 | Isolation | **`@MainActor`.** SDL3 wants windowing and events on the main thread, and CF's state is global. The public API is annotated explicitly rather than through a module-wide default-isolation flag, so the isolation shows in the interface whatever the build system. |
 | GPU and audio handles | **`~Copyable` owners plus `Hashable` IDs.** `Texture`, `Canvas`, `Shader`, `Mesh`, `Material`, `Audio` and the other types CF makes you destroy are `~Copyable` structs whose `deinit` queues the destroy. Each has a copyable, `Hashable` `ID` for dictionary keys and non-owning references. Types with nothing to destroy (`Sprite`, `Color`, vectors, transforms) stay copyable. |
 | Errors | **Typed `throws`** in place of `CF_Result`. Swift 6.4's typed-throwing `Task` initializers carry the same error type across `async` code. |
@@ -106,6 +106,43 @@ the span. Game code never sees this. The display paced frames to 16 ms during th
 slows each run down but leaves `submit_ms` comparable within the batch. Going faster than C
 means changing CF's per-sprite work, which is phase 6.
 
+
+## CMake build (2026-09-28)
+
+`CMakeLists.txt` adds CF as a subproject, and CF fetches SDL3, Box2D, Box3D and PhysFS. `CCute`
+and the `Kania` library sit on top, and the samples and benchmarks build only when Kania is the
+top-level project. `Examples/MinimalGame` pulls Kania in with `FetchContent`, as a game outside
+the repository would, and CI builds and runs it against the checkout on all three OSes.
+
+Gate, on macOS arm64:
+- The `HelloTriangle` screenshot is byte-identical to the SwiftPM build's.
+- Every benchmark checksum matches C.
+- Each Swift variant's submit time is within 5% of its SwiftPM-built twin, inside batch noise
+  and in no consistent direction.
+
+On Linux aarch64 (Docker), the screenshot is byte-identical to macOS and every checksum matches.
+
+CMake did less than SwiftPM had done implicitly, and each gap was silent until checked:
+
+- **Swift 6 language mode.** CMake defaults to Swift 5 mode, which turns strict concurrency off.
+  The build sets `CMAKE_Swift_LANGUAGE_VERSION 6` and whole-module optimization in Release.
+- **The macOS deployment target.** CMake passes `CMAKE_OSX_DEPLOYMENT_TARGET` to C but not to
+  Swift, so swiftc targeted the build machine's macOS 27. The build sets
+  `CMAKE_Swift_COMPILER_TARGET` from it, and the binaries now say `minos 26.0`.
+- **Which Swift.** With Ninja on macOS, CMake asks `xcrun` for `swiftc` and gets the Command Line
+  Tools' Swift rather than the swiftly toolchain `.swift-version` pins. The presets take `swiftc`
+  from `PATH`.
+- **`-pthread` on Linux.** SDL3 (a link option) and s2n (through FindThreads) link with
+  `-pthread`, which swiftc rejects. Swift links hand it to clang with `-Xclang-linker` instead.
+  Kania creates `Threads::Threads` before CF so it can adjust it.
+- **Windows.** Every configuration uses the release DLL C runtime, because Swift has no debug
+  variant, and C and C++ are built with MSVC `cl`.
+- **swift-collections as a subproject.** It turns on shared libraries on Darwin and Windows unless
+  `BUILD_SHARED_LIBS` is already set, and every module joins `all`. The build sets
+  `BUILD_SHARED_LIBS OFF` and fetches it `EXCLUDE_FROM_ALL`.
+
+Two `xvfb-run` calls back to back in one container sometimes hung while the second started
+Xvfb, so the Linux job and `Scripts/linux-container.sh` now run everything under one X server.
 
 ## Open
 

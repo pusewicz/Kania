@@ -11,30 +11,40 @@ installed with swiftly).
 ## Commands
 
 ```sh
-Scripts/build-cf.sh                  # CMake-build static CF for this triple; rerun after any change under Vendor/
-swift build -c release               # all targets; binaries land in $(swift build -c release --show-bin-path)
-swift format lint --strict --recursive Package.swift Sources Samples Benchmarks
+cmake --preset release               # configure build/release with Ninja (debug preset: build/debug)
+cmake --build --preset release       # everything; executables land in build/release/bin
+swift format lint --strict --recursive Sources Samples Benchmarks Examples
 Scripts/bench.rb --impls a,b --runs 3 --frames 300  # focused comparison; rules in Benchmarks/CLAUDE.md
 Scripts/linux-container.sh           # Linux (native arch) build + HelloTriangle + benchmark in Docker, Xvfb + lavapipe
 ```
 
 There is no test target yet. Verification is a screenshot and the benchmark checksum:
 `HelloTriangle --frames 30 --screenshot out.png`, and `SpriteBench`/`SpriteBenchC` with
-`--count 1000 --frames 60`, whose JSON `checksum` fields must be equal.
+`--count 1000 --frames 60`, whose JSON `checksum` fields must be equal. On Windows, configure from
+a Visual Studio developer prompt.
 
 ## How the pieces fit
 
-- **CF is prebuilt, not compiled by SwiftPM.** `Scripts/build-cf.sh` runs CF's CMake into
-  `Vendor/build/<triple>/` and collects static libs, public headers and CMake's own sample link
-  line (`link.txt`) into `Vendor/prebuilt/<triple>/`. `Package.swift` links those with
-  `unsafeFlags` (`-L`, `-I`, frameworks mirrored from `link.txt`), so the package cannot be a
-  remote SwiftPM dependency. Phase 1 moves the build to CMake (`PHASE1.md`); `Package.swift` and
-  `build-cf.sh` go once CMake builds CF, the samples and the benchmarks. The macOS deployment target
-  in `build-cf.sh` must match `Package.swift` (26.0).
+- **CMake builds everything.** `CMakeLists.txt` adds CF (the submodule) as a subproject, and CF
+  fetches SDL3, Box2D, Box3D and PhysFS. The `CCute` shim and the `Kania` library sit on top.
+  Samples and benchmarks build only when Kania is the top-level project. Source files are listed
+  explicitly, so a new Swift file goes into its target's list.
+- **Games consume Kania with `FetchContent`.** `Examples/MinimalGame` is that setup, and CI
+  builds it against the checkout with `-DFETCHCONTENT_SOURCE_DIR_KANIA`. A change that breaks it
+  breaks every game.
+- **CMake does less for Swift than SwiftPM did, so `CMakeLists.txt` sets it explicitly:**
+  - Swift 6 language mode and whole-module optimization in Release.
+  - A Swift `-target` carrying the macOS deployment target (26.0); without it swiftc targets the
+    build machine's OS.
+  - The MSVC release DLL runtime on Windows.
+  - Linux `-pthread` handling: SDL3 and s2n link with it, and swiftc rejects it.
+  - `swiftc` from `PATH`, set in the presets. Otherwise CMake on macOS asks `xcrun` and gets the
+    Command Line Tools' Swift, not the swiftly toolchain.
 - **`Sources/CCute` is the only C shim.** Swift drops C11 `_Generic` macros, variadic macros such
   as `cf_v2` (use `CF_V2(x:y:)`), and mutable C globals under Swift 6. The shim wraps the binding
   macros, CF's `extern` time globals and `stderr`. Glibc's `stderr` compiles on macOS but fails on
-  Linux, so anything touching libc globals goes through the shim.
+  Linux, so anything touching libc globals goes through the shim. Swift sees it through
+  `Sources/CCute/include/module.modulemap`.
 - **The draw-path benchmarks** (`Benchmarks/SpriteBench`, its C twin `Benchmarks/SpriteBenchC`,
   and `Scripts/bench.rb`) have their own rules in `Benchmarks/CLAUDE.md`.
 - **Screenshots:** CF has no GPU command buffer between `cf_app_draw_onto_screen` and the next
@@ -70,8 +80,9 @@ rules are kept. Record phase decisions and findings in the repo too, in `PHASE<n
 
 ## CI
 
-`.github/workflows/phase0.yml` builds and runs on macOS 26, Linux (Swift container, lavapipe) and
-Windows (MSVC-built CF) on every push; the repository is public, so Actions costs nothing. A newer
+`.github/workflows/ci.yml` builds the release preset, runs HelloTriangle and the benchmark, and
+builds `Examples/MinimalGame` on macOS 26, Linux (Swift container, lavapipe) and Windows (MSVC) on
+every push; the repository is public, so Actions costs nothing. A newer
 push to the same branch cancels the run in progress. The benchmark step there is a one-run smoke
 test: runners have no GPU, so CI timings mean nothing, but every variant must run and match C's
 checksum. The Windows benchmark step is `continue-on-error` until CF's texture assert at 10k

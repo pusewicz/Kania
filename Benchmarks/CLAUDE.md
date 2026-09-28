@@ -9,9 +9,9 @@ reading are in `PHASE0.md` and `PHASE1.md`, and the tables are in `Results/`.
 - **The two are twins.** Both use the same LCG, entity order, bounce rule, CLI and JSON output.
   Change them together. A Swift variant counts only if its `checksum` equals C's at the same
   `--count` and `--frames`. `bench.rb`'s table marks any difference.
-- **The C twin's flags are part of the contract.** `-O3` matches CF's CMake Release build; SwiftPM
-  would use `-Os` for C. `-ffp-contract=off` is needed because clang fuses `a + b * c` into an FMA
-  and Swift never does, and without it the checksums differ in the last bits.
+- **The C twin's flags are part of the contract.** It builds at `-O3`, CMake's Release level for C
+  and the level CF uses. `CMakeLists.txt` adds `-ffp-contract=off`, because clang fuses `a + b * c`
+  into an FMA and Swift never does; without it the checksums differ in the last bits.
 - **`step(frame:)` holds only the frame's submission work.** It is the only part timed as
   `submit_ms`, so setup belongs in `init`.
 - **Adding a Swift variant** takes a `Workload` class in `Implementations.swift` whose doc comment
@@ -22,8 +22,10 @@ reading are in `PHASE0.md` and `PHASE1.md`, and the tables are in `Results/`.
 - **Use swift-collections' `UniqueArray`, not the standard library's.** The standard library's
   needs macOS 27 / iOS 27, above Kania's minimum; `BasicContainers.UniqueArray` runs on macOS 26.
   Both are in scope, so qualify the name.
-- **Compiler-flag variants** go through `KANIA_BENCH_SWIFTFLAGS`, which reaches `SpriteBench` only.
-  Build each one with its own `--scratch-path` and pass that directory to `bench.rb --bin`.
+- **Compiler-flag variants** go through the `KANIA_BENCH_SWIFT_FLAGS` cache variable, which reaches
+  `SpriteBench` only. Configure each variant in its own build directory, for example
+  `cmake --preset release -B build/noexcl -DKANIA_BENCH_SWIFT_FLAGS=-enforce-exclusivity=unchecked`,
+  and pass its `bin/` to `bench.rb --bin`.
 
 ## Measuring
 

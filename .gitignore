@@ -1,10 +1,4 @@
-.build/
-/Vendor/prebuilt/
-/Vendor/build/
 *.dSYM
 .DS_Store
-.build-*/
-/Results/raw-progress.log
-/.build-linux.log
 .ruby-lsp/
 /build/
