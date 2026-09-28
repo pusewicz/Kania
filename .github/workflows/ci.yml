@@ -87,11 +87,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with: { submodules: true }
+      # MSVC first: gha-setup-swift moves the whole PATH into GITHUB_PATH, which the runner puts
+      # ahead of the Path a later action exports. MSVC's link.exe would then come after Git's
+      # coreutils link, which swiftc runs to create static libraries.
+      - uses: ilammy/msvc-dev-cmd@v1
       - uses: compnerd/gha-setup-swift@v0.5.0
         with:
           swift-version: swift-6.4.0-release
           swift-build: 6.4.0-RELEASE
-      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Which link, cl and lld-link come first (temporary)
+        shell: pwsh
+        run: Get-Command -All -ErrorAction SilentlyContinue link, cl, lld-link | Format-Table -AutoSize Name, Source
       - run: cmake --preset release
       - run: cmake --build --preset release
       - name: Tests (not yet expected to pass on Windows)
@@ -106,12 +112,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ruby Scripts/bench.rb --label ci-windows --runs 1 --frames 60 --output bench-windows.md
       - name: Example game against this checkout
-        shell: bash
+        # Not bash: Git's bash.exe puts its /usr/bin, and its link, ahead of MSVC's.
+        shell: pwsh
         run: |
-          cmake -S Examples/MinimalGame -B build/example -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DFETCHCONTENT_SOURCE_DIR_KANIA="$GITHUB_WORKSPACE"
+          $PSNativeCommandUseErrorActionPreference = $true
+          cmake -S Examples/MinimalGame -B build/example -G Ninja -DCMAKE_BUILD_TYPE=Release `
+            -DFETCHCONTENT_SOURCE_DIR_KANIA="$env:GITHUB_WORKSPACE"
           cmake --build build/example
-          KANIA_EXIT_AFTER_FRAMES=30 build/example/MinimalGame.exe
+          $env:KANIA_EXIT_AFTER_FRAMES = 30
+          build\example\MinimalGame.exe
       - uses: actions/upload-artifact@v7
         if: always()
         with: { name: windows, path: "hello-windows.png\nbench-windows.md\nResults/raw/ci-windows.jsonl" }
