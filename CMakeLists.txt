@@ -65,9 +65,16 @@ target_link_libraries(CCute PUBLIC cute)
 
 add_library(Kania STATIC
   Sources/Kania/App.swift
+  Sources/Kania/Canvas.swift
+  Sources/Kania/Color.swift
+  Sources/Kania/DestroyQueue.swift
+  Sources/Kania/Draw.swift
   Sources/Kania/Game.swift
   Sources/Kania/Kania.swift
-  Sources/Kania/KaniaError.swift)
+  Sources/Kania/KaniaError.swift
+  Sources/Kania/Readback.swift)
+# Kania's tests share its package, so they can check its `package` diagnostics.
+target_compile_options(Kania PRIVATE "SHELL:-package-name Kania")
 target_include_directories(Kania INTERFACE ${CMAKE_Swift_MODULE_DIRECTORY})
 # Public: Kania's types will hold CF values, so clients need CCute to lay them out.
 target_link_libraries(Kania PUBLIC CCute)
@@ -80,8 +87,14 @@ if(KANIA_BUILD_TESTS)
   target_compile_options(AppLoopTest PRIVATE -parse-as-library)
   target_link_libraries(AppLoopTest PRIVATE Kania)
   add_test(NAME app-loop COMMAND AppLoopTest)
+
+  add_executable(CanvasTest Tests/Canvas/CanvasTest.swift)
+  target_compile_options(CanvasTest PRIVATE -parse-as-library "SHELL:-package-name Kania")
+  target_link_libraries(CanvasTest PRIVATE Kania)
+  add_test(NAME canvas COMMAND CanvasTest)
+
   # A game that never quits would otherwise hold CI for ctest's default 25 minutes.
-  set_tests_properties(app-loop PROPERTIES TIMEOUT 60)
+  set_tests_properties(app-loop canvas PROPERTIES TIMEOUT 60)
 endif()
 
 if(KANIA_BUILD_SAMPLES)

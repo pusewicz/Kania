@@ -14,8 +14,10 @@ internal import CCute
 ///   mutating func update() {}
 /// }
 /// ```
+///
+/// A game may be `~Copyable`, so it can own values such as a ``Canvas`` directly.
 @MainActor
-public protocol Game {
+public protocol Game: ~Copyable {
   /// The window the game opens in.
   static var window: WindowOptions { get }
 
@@ -29,7 +31,7 @@ public protocol Game {
   mutating func draw()
 }
 
-extension Game {
+extension Game where Self: ~Copyable {
   /// A 1280 by 720 window titled "Kania".
   public static var window: WindowOptions { WindowOptions() }
 
