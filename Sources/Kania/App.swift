@@ -73,6 +73,10 @@ final class Runner {
   private let makeGame: @MainActor () throws(KaniaError) -> any FrameHandler
   private var game: (any FrameHandler)?
 
+  /// Frames left before the app quits by itself, from `KANIA_EXIT_AFTER_FRAMES`; `nil` runs until
+  /// the game quits.
+  private var framesLeft: Int?
+
   /// Creates a runner that opens `window`, then creates the game with `makeGame`.
   init(window: WindowOptions, makeGame: @escaping @MainActor () throws(KaniaError) -> any FrameHandler) {
     self.window = window
@@ -88,6 +92,9 @@ final class Runner {
       report(KaniaError(result))
       return SDL_APP_FAILURE
     }
+    if let value = getenv("KANIA_EXIT_AFTER_FRAMES"), let frames = Int(String(cString: value)), frames > 0 {
+      framesLeft = frames
+    }
     do {
       game = try makeGame()
     } catch {
@@ -102,6 +109,10 @@ final class Runner {
   func iterate() -> SDL_AppResult {
     cf_app_update(nil)
     game?.frame()
+    if let left = framesLeft {
+      framesLeft = left - 1
+      if left == 1 { cf_app_signal_shutdown() }
+    }
     cf_app_draw_onto_screen(true)
     Readback.afterPresent()
     DestroyQueue.drain()

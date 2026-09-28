@@ -16,6 +16,9 @@ internal import CCute
 /// ```
 ///
 /// A game may be `~Copyable`, so it can own values such as a ``Canvas`` directly.
+///
+/// Setting the environment variable `KANIA_EXIT_AFTER_FRAMES` to a positive number makes any game
+/// quit after that many frames, which is how CI runs games unattended.
 @MainActor
 public protocol Game: ~Copyable {
   /// The window the game opens in.

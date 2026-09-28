@@ -24,5 +24,7 @@ FetchContent_Declare(Kania
   GIT_TAG main)
 FetchContent_MakeAvailable(Kania)
 
-add_executable(MinimalGame main.swift)
+add_executable(MinimalGame MinimalGame.swift)
+# A one-file executable is compiled as top-level code unless told otherwise, which @main rejects.
+target_compile_options(MinimalGame PRIVATE -parse-as-library)
 target_link_libraries(MinimalGame PRIVATE Kania)

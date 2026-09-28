@@ -37,7 +37,7 @@ jobs:
           cmake -S Examples/MinimalGame -B build/example -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_Swift_COMPILER=swiftc -DFETCHCONTENT_SOURCE_DIR_KANIA="$GITHUB_WORKSPACE"
           cmake --build build/example
-          build/example/MinimalGame
+          KANIA_EXIT_AFTER_FRAMES=30 build/example/MinimalGame
       - uses: actions/upload-artifact@v7
         if: always()
         with: { name: macos, path: "hello-macos.png\nbench-macos.md\nResults/raw/ci-macos.jsonl" }
@@ -74,7 +74,8 @@ jobs:
           cmake -S Examples/MinimalGame -B build/example -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DFETCHCONTENT_SOURCE_DIR_KANIA="$GITHUB_WORKSPACE"
           cmake --build build/example
-          build/example/MinimalGame
+          export XDG_RUNTIME_DIR=/tmp/xdg; mkdir -p "$XDG_RUNTIME_DIR"; chmod 700 "$XDG_RUNTIME_DIR"
+          KANIA_EXIT_AFTER_FRAMES=30 xvfb-run -a -s "-screen 0 1280x960x24" build/example/MinimalGame
       - uses: actions/upload-artifact@v7
         if: always()
         with: { name: linux, path: "hello-linux.png\nbench-linux.md\nResults/raw/ci-linux.jsonl" }
@@ -110,7 +111,7 @@ jobs:
           cmake -S Examples/MinimalGame -B build/example -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DFETCHCONTENT_SOURCE_DIR_KANIA="$GITHUB_WORKSPACE"
           cmake --build build/example
-          build/example/MinimalGame.exe
+          KANIA_EXIT_AFTER_FRAMES=30 build/example/MinimalGame.exe
       - uses: actions/upload-artifact@v7
         if: always()
         with: { name: windows, path: "hello-windows.png\nbench-windows.md\nResults/raw/ci-windows.jsonl" }

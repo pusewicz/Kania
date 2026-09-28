@@ -19,8 +19,10 @@ Scripts/bench.rb --impls a,b --runs 3 --frames 300  # focused comparison; rules 
 Scripts/linux-container.sh           # Linux (native arch) build + HelloTriangle + benchmark in Docker, Xvfb + lavapipe
 ```
 
-`ctest` runs `Tests/AppLoop`, a small game that checks the frame loop; Swift Testing comes with the
-Kania API tests. Beyond that, verification is a screenshot and the benchmark checksum:
+`ctest` runs the small games in `Tests/` that check the frame loop, canvases and sprite drawing
+through pixel readback; Swift Testing comes with the Kania API tests. `KANIA_EXIT_AFTER_FRAMES=N`
+makes any Kania game quit after N frames, which is how CI runs `Examples/MinimalGame`. Beyond
+that, verification is a screenshot and the benchmark checksum:
 `HelloTriangle --frames 30 --screenshot out.png`, and `SpriteBench`/`SpriteBenchC` with
 `--count 1000 --frames 60`, whose JSON `checksum` fields must be equal. On Windows, configure from
 a Visual Studio developer prompt.
