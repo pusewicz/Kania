@@ -6,7 +6,7 @@ internal import CCute
 /// is done, and for good if the copy failed, in which case ``error`` says why.
 @MainActor
 public final class Readback {
-  /// The pixels, in rows of ``width`` pixels, once the copy is done.
+  /// The pixels, once the copy is done: rows of ``width`` pixels, starting with the top row.
   public private(set) var pixels: [Pixel]?
 
   /// Why the copy failed, if it did.

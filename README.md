@@ -24,7 +24,8 @@ cmake --build --preset release # executables land in build/release/bin
 ## Use it in a game
 
 A game is a CMake project that pulls Kania in with `FetchContent`;
-[`Examples/MinimalGame`](Examples/MinimalGame/CMakeLists.txt) is the smallest one.
+[`Examples/MinimalGame`](Examples/MinimalGame/CMakeLists.txt) is the smallest one, an animated
+sprite. Set `KANIA_EXIT_AFTER_FRAMES=N` to make any Kania game quit after N frames.
 
 ## Run
 
@@ -47,7 +48,7 @@ CMakeLists.txt           builds CF as a subproject, then Kania, samples and benc
 Sources/CCute/           C shim over CF for Swift (wraps _Generic macros and extern globals)
 Sources/Kania/           the Kania library (the API starts in phase 1)
 Examples/MinimalGame/    a game project consuming Kania with FetchContent
-Tests/AppLoop/           checks the frame loop; run with ctest
+Tests/                   small games that check Kania, run with ctest
 Sources/SpikeSupport/    option parsing, timing summaries, PNG screenshots
 Samples/HelloTriangle/   low-level graphics API from Swift
 Benchmarks/SpriteBench*/ draw-path benchmark, C and Swift twins

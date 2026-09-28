@@ -207,6 +207,30 @@ To review: `Readback` is a class the game polls, because a copy spans frames and
 canvas can't be captured by a `Task`; an `async` form can sit on top of it later. Pixel row order is
 not documented yet, because a solid colour can't show it; the sprite tests will.
 
+## Sprites and drawing (2026-09-28)
+
+`Sprite` is a value type over `CF_Sprite`, with `position`, `scale` and `opacity`, `play(_:)` and
+`update()`. `Sprite.demo()` wraps CF's built-in demo sprite, the only one available until loading
+from files comes with the file system. `Draw.sprite(_:)` queues one sprite by value; for a few
+draws the copy doesn't matter. `Draw.sprites(_:)` takes `inout [Sprite]` and hands CF each sprite
+in place through `mutableSpan`, the loop that matched C in the benchmark. Its disassembly is one
+uniqueness check per call, then `cf_draw_sprite` on each element's own address, stepping 136 bytes
+at a time, with no copies and no bounds checks.
+
+`Tests/Sprites` draws one sprite with `Draw.sprite` and two with `Draw.sprites` into a canvas the
+size of the window, then reads it back. It checks that every sprite drew inside the box its
+position predicts, and that nothing was drawn anywhere else. That pins down the coordinates: the
+origin is the centre of the window, y points up, and readback rows run from the top. With the
+opposite row order assumed, the test fails. It passes on macOS and Linux.
+
+`Examples/MinimalGame` now animates the demo sprite. `KANIA_EXIT_AFTER_FRAMES=N` makes any Kania
+game quit after N frames, so CI runs the example for 30 frames instead of only building it.
+
+To review: positions and scales are `SIMD2<Float>` rather than a Kania vector type. That is
+zero-cost and interoperates with the standard library, but long operator expressions over it have
+been slow to type-check. `Draw` is a namespace of static functions, rather than methods such as
+`sprite.draw()`.
+
 ## Open
 
 - **3D scope** (draw 3D, models, Box3D). This decides the size of the "remaining subsystems" task.

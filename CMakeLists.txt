@@ -72,7 +72,8 @@ add_library(Kania STATIC
   Sources/Kania/Game.swift
   Sources/Kania/Kania.swift
   Sources/Kania/KaniaError.swift
-  Sources/Kania/Readback.swift)
+  Sources/Kania/Readback.swift
+  Sources/Kania/Sprite.swift)
 # Kania's tests share its package, so they can check its `package` diagnostics.
 target_compile_options(Kania PRIVATE "SHELL:-package-name Kania")
 target_include_directories(Kania INTERFACE ${CMAKE_Swift_MODULE_DIRECTORY})
@@ -93,8 +94,13 @@ if(KANIA_BUILD_TESTS)
   target_link_libraries(CanvasTest PRIVATE Kania)
   add_test(NAME canvas COMMAND CanvasTest)
 
+  add_executable(SpriteTest Tests/Sprites/SpriteTest.swift)
+  target_compile_options(SpriteTest PRIVATE -parse-as-library)
+  target_link_libraries(SpriteTest PRIVATE Kania)
+  add_test(NAME sprites COMMAND SpriteTest)
+
   # A game that never quits would otherwise hold CI for ctest's default 25 minutes.
-  set_tests_properties(app-loop canvas PROPERTIES TIMEOUT 60)
+  set_tests_properties(app-loop canvas sprites PROPERTIES TIMEOUT 60)
 endif()
 
 if(KANIA_BUILD_SAMPLES)
