@@ -265,6 +265,41 @@ job counts toward the run's result. The benchmark passes at 100 and 1,000 sprite
 at 10k (see Open). Worth taking from SDL's CI later: its tests run under `sdlprocdump`, which writes
 a minidump when a test crashes, and failed jobs upload the dumps.
 
+## Files and sprites from disk (2026-09-28)
+
+`FileSystem` wraps CF's virtual file system, which is PhysFS underneath. Games name files by
+virtual paths such as `/content/girl.aseprite`. `mount(_:at:)` adds a real directory or archive
+under a virtual directory, `unmount(_:)` removes it, and `fileExists(atPath:)` checks a path. CF
+mounts the executable's directory at `/` when the app starts, so content copied next to the
+binary loads without a mount. `FileSystem.baseDirectory` is that directory's real path, with a
+trailing separator. `Sprite(contentsOf:)` loads an Aseprite file from a virtual path; CF caches it,
+so loading it again is cheap.
+
+- **A CF patch, `cf_sprite_load`.** On failure, `cf_make_sprite` shows a modal message box, which
+  blocks until someone dismisses it: impossible behind a `throws` API, and a hang in CI. The loader
+  underneath returns an error but is internal C++. The patch adds a public `cf_sprite_load` that
+  loads and caches the same way and returns the error; it lives on its own fork branch and PR
+  against `kania`.
+- **CF's Aseprite parser doesn't validate its input.** `cute_aseprite` checks the magic number and
+  its bounds with asserts, which compile out in release builds. A text file named `.aseprite`
+  crashed it with a bus error, and a truncated file "loaded" by reading past the end of its buffer.
+  Kania now checks the header before CF parses the file: at least 128 bytes, the magic number
+  `0xA5E0`, and a declared size equal to the file's size. Files that aren't Aseprite files, and
+  truncated files, throw with the reason. A file with a well-formed header but corrupt contents can
+  still crash CF until Kania's own Aseprite loader replaces `cute_aseprite`. The owner chose this
+  check over validating every file with swift-aseprite now, or fixing CF's parser in the fork.
+
+`Tests/Assets` mounts `Tests/Assets/content` and checks:
+- the default mount at `/`;
+- that a missing directory fails to mount;
+- that `girl.aseprite` loads and draws where it should, through a readback;
+- that a missing file, a text file and a truncated file each throw, with a message that says why;
+- that unmounting removes the files.
+
+Because the test has a timeout, a regression back to CF's dialog would fail it rather than hang
+CI. `Examples/MinimalGame` now loads the sprite it ships in `content/`, copied next to the
+executable after each build.
+
 ## Benchmarking the shipped API (2026-09-29)
 
 `SpriteBench` has a `kania` variant that goes through Kania's public API, where `overlay-span-inplace`

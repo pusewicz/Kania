@@ -75,6 +75,7 @@ add_library(Kania STATIC
   Sources/Kania/Color.swift
   Sources/Kania/DestroyQueue.swift
   Sources/Kania/Draw.swift
+  Sources/Kania/FileSystem.swift
   Sources/Kania/Game.swift
   Sources/Kania/Kania.swift
   Sources/Kania/KaniaError.swift
@@ -105,8 +106,14 @@ if(KANIA_BUILD_TESTS)
   target_link_libraries(SpriteTest PRIVATE Kania)
   add_test(NAME sprites COMMAND SpriteTest)
 
-  # A game that never quits would otherwise hold CI for ctest's default 25 minutes.
-  set_tests_properties(app-loop canvas sprites PROPERTIES TIMEOUT 60)
+  add_executable(AssetTest Tests/Assets/AssetTest.swift)
+  target_compile_options(AssetTest PRIVATE -parse-as-library)
+  target_link_libraries(AssetTest PRIVATE Kania)
+  add_test(NAME assets COMMAND AssetTest ${CMAKE_CURRENT_SOURCE_DIR}/Tests/Assets/content)
+
+  # A game that never quits, or waits on a modal dialog, would otherwise hold CI for ctest's
+  # default 25 minutes.
+  set_tests_properties(app-loop canvas sprites assets PROPERTIES TIMEOUT 60)
 endif()
 
 if(KANIA_BUILD_SAMPLES)
