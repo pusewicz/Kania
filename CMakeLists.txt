@@ -80,6 +80,8 @@ if(KANIA_BUILD_TESTS)
   target_compile_options(AppLoopTest PRIVATE -parse-as-library)
   target_link_libraries(AppLoopTest PRIVATE Kania)
   add_test(NAME app-loop COMMAND AppLoopTest)
+  # A game that never quits would otherwise hold CI for ctest's default 25 minutes.
+  set_tests_properties(app-loop PROPERTIES TIMEOUT 60)
 endif()
 
 if(KANIA_BUILD_SAMPLES)

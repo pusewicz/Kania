@@ -168,8 +168,9 @@ be defined in a C file of the game. Each frame, Kania calls CF's update, the gam
 
 `Tests/AppLoop` is a small game that `ctest` runs in its own process, because SDL's loop needs the
 process's real `main`. It checks that every frame runs on SDL's main thread and that a
-`Task { @MainActor in }` started in frame 0 has run before frame 1's update. It passes on macOS and
-on Linux under Xvfb. With the Linux drain removed, it fails with "a main-actor task started in
+`Task { @MainActor in }` started in frame 0 has run before frame 1's update. It passes on macOS, 20
+runs out of 20, where Kania calls no drain at all, so the Cocoa run loop does drain the main queue.
+It passes on Linux under Xvfb. With the Linux drain removed, it fails with "a main-actor task started in
 frame 0 had not run by frame 1", so the test is what catches a missing drain. Windows is not run
 yet. Swift Testing is not set up either; it comes with the Kania API tests (`p1-tests`), since the
 loop can't run inside a test runner.
