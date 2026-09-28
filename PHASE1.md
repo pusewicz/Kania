@@ -265,6 +265,35 @@ job counts toward the run's result. The benchmark passes at 100 and 1,000 sprite
 at 10k (see Open). Worth taking from SDL's CI later: its tests run under `sdlprocdump`, which writes
 a minidump when a test crashes, and failed jobs upload the dumps.
 
+## Benchmarking the shipped API (2026-09-29)
+
+`SpriteBench` has a `kania` variant that goes through Kania's public API, where `overlay-span-inplace`
+is a hand-rolled copy: `Kania.Sprite` values in an `Array`, velocities in a parallel array, both
+moved through `mutableSpan`, then `Draw.sprites(&sprites)`. Its checksum equals C's at 1000 sprites
+over 60 and over 600 frames. One batch, 3 runs of 300 frames (`Results/macos-arm64-phase1-api.md`):
+
+| count | impl | submit ms | vs C |
+|---:|---|---:|---:|
+| 10000 | c | 0.5170 | |
+| 10000 | overlay-span-inplace | 0.5190 | +0.4% |
+| 10000 | kania | 0.5454 | +5.5% |
+
+`kania` is 2.8% to 8.0% slower than `overlay-span-inplace` in each of the three rounds, past the 4%
+that batch noise allows, so the copy stays until this is settled. The 1000-sprite rows say nothing:
+C itself went from 0.053 to 0.140 to 0.214 ms across the rounds.
+
+The disassembly of `KaniaWorkload.step` shows `position`'s getter and setter inlined into the loop.
+`Sprite.update()` is not: each sprite costs one `bl` to a two-instruction thunk that tail-calls
+`cf_sprite_update`. `Draw.sprites` is one call per frame, and its loop calls `cf_draw_sprite`
+directly. The `swift_beginAccess` and uniqueness checks on the two class-held arrays run once per
+frame, outside the loop.
+
+Two causes fit and have not been separated: the 10,000 un-inlined `update()` calls per frame, and
+the second pass over 1.44 MB of sprites that a batch draw after the update loop implies.
+`overlay-span-inplace` has neither. Making `update()` inlinable means `@inlinable` with
+`@usableFromInline` storage and a public `import CCute`, or cross-module optimization on the Kania
+target, and either changes what Kania exposes, so it is decided apart from the benchmark.
+
 ## Open
 
 - **3D scope** (draw 3D, models, Box3D). This decides the size of the "remaining subsystems" task.

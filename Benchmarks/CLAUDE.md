@@ -21,7 +21,9 @@ reading are in `PHASE0.md` and `PHASE1.md`, and the tables are in `Results/`.
   where it can't run.
 - **Delete a variant once its question is answered.** The finding goes in `PHASE<n>.md` and the
   code stays in git history. The benchmark keeps only the floor (`raw-buffer`) and the shape Kania
-  ships, so CI's smoke test runs what matters.
+  ships, so CI's smoke test runs what matters. `kania` runs the public `Sprite` and `Draw` API, so
+  a regression in the shipped path shows there; `overlay-span-inplace` is a hand-rolled copy that
+  stays only until `kania` matches it (`TODO.md`).
 
 ## Measuring
 

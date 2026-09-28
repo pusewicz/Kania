@@ -10,7 +10,7 @@ import CCute
 import SpikeSupport
 
 /// The sprite implementations, in report order.
-let spriteImpls = ["raw-buffer", "overlay-span-inplace"]
+let spriteImpls = ["raw-buffer", "overlay-span-inplace", "kania"]
 
 if CommandLine.arguments.dropFirst().elementsEqual(["--list-impls"]) {
   print(spriteImpls.joined(separator: "\n"))
@@ -33,10 +33,12 @@ guard !cf_is_error(result) else { fatalError("cf_make_app failed") }
 let immediate = cf_app_set_present_mode(CF_PRESENT_MODE_IMMEDIATE)
 
 /// Creates the workload for `impl`, exiting on an unknown name.
+@MainActor
 func makeWorkload(impl: String, count: Int) -> any Workload {
   switch impl {
   case "raw-buffer": return RawBufferWorkload(count: count)
   case "overlay-span-inplace": return OverlaySpanInPlaceWorkload(count: count)
+  case "kania": return KaniaWorkload(count: count)
   default: fatalError("unknown impl \(impl)")
   }
 }
