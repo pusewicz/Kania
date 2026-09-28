@@ -3,9 +3,10 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 Kania is a Swift 2D game framework that starts on Cute Framework (CF) and replaces it phase by
-phase until only SDL3, Box2D and Dear ImGui remain in C. The repository is at the end of phase 0
-(a spike, findings in `PHASE0.md`); no Kania API exists yet. Minimum Apple versions: macOS 26 and
-iOS 26. Toolchain: Swift 6.4 (`.swift-version`, installed with swiftly).
+phase until only SDL3, Box2D and Dear ImGui remain in C. Phase 0 (a spike) is done, with findings in
+`PHASE0.md`. Phase 1 (the Kania API over CF) has started; its decisions are in `PHASE1.md`. No Kania
+API exists yet. Minimum Apple versions: macOS 26 and iOS 26. Toolchain: Swift 6.4 (`.swift-version`,
+installed with swiftly).
 
 ## Commands
 
@@ -26,8 +27,9 @@ There is no test target yet. Verification is a screenshot and the benchmark chec
 - **CF is prebuilt, not compiled by SwiftPM.** `Scripts/build-cf.sh` runs CF's CMake into
   `Vendor/build/<triple>/` and collects static libs, public headers and CMake's own sample link
   line (`link.txt`) into `Vendor/prebuilt/<triple>/`. `Package.swift` links those with
-  `unsafeFlags` (`-L`, `-I`, frameworks mirrored from `link.txt`), so the package cannot yet be a
-  remote SwiftPM dependency; choosing real packaging is a phase 1 task. The macOS deployment target
+  `unsafeFlags` (`-L`, `-I`, frameworks mirrored from `link.txt`), so the package cannot be a
+  remote SwiftPM dependency. Phase 1 moves the build to CMake (`PHASE1.md`); `Package.swift` and
+  `build-cf.sh` go once CMake builds CF, the samples and the benchmarks. The macOS deployment target
   in `build-cf.sh` must match `Package.swift` (26.0).
 - **`Sources/CCute` is the only C shim.** Swift drops C11 `_Generic` macros, variadic macros such
   as `cf_v2` (use `CF_V2(x:y:)`), and mutable C globals under Swift 6. The shim wraps the binding
@@ -75,7 +77,7 @@ Keep it current as part of finishing work, with the `ArtifactData` tool (one `ba
 
 Decisions, findings and estimate changes are prose, not data: read the artifact, edit the HTML
 from that read, and publish it to the same URL without `capabilities` so the database and its
-rules are kept. Record phase findings in the repo too (`PHASE0.md` for phase 0).
+rules are kept. Record phase decisions and findings in the repo too, in `PHASE<n>.md`.
 
 ## CI
 
