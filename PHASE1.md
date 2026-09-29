@@ -278,8 +278,8 @@ so loading it again is cheap.
 - **A CF patch, `cf_sprite_load`.** On failure, `cf_make_sprite` shows a modal message box, which
   blocks until someone dismisses it: impossible behind a `throws` API, and a hang in CI. The loader
   underneath returns an error but is internal C++. The patch adds a public `cf_sprite_load` that
-  loads and caches the same way and returns the error; it lives on its own fork branch and PR
-  against `kania`.
+  loads and caches the same way and returns the error. It is a commit on Kania's `kania` branch
+  of CF.
 - **CF's Aseprite parser doesn't validate its input.** `cute_aseprite` checks the magic number and
   its bounds with asserts, which compile out in release builds. A text file named `.aseprite`
   crashed it with a bus error, and a truncated file "loaded" by reading past the end of its buffer.
