@@ -96,6 +96,8 @@ The patches so far:
 - `-msse4.1` is passed only on x86 Linux, so aarch64 Linux builds.
 - `cf_sprite_load` loads a sprite and returns an error, where `cf_make_sprite` shows a modal
   message box that blocks until someone dismisses it.
+- A sprite slice key holds until the slice's next key, as in Aseprite, instead of the first key at
+  or after the frame being used. From RandyGaul/cute_framework#626, closed upstream unmerged.
 
 ## Plan and progress
 
