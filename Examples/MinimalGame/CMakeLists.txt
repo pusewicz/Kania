@@ -28,3 +28,8 @@ add_executable(MinimalGame MinimalGame.swift)
 # A one-file executable is compiled as top-level code unless told otherwise, which @main rejects.
 target_compile_options(MinimalGame PRIVATE -parse-as-library)
 target_link_libraries(MinimalGame PRIVATE Kania)
+
+# Kania mounts the executable's directory at "/", so content copied next to it loads as "/content/...".
+add_custom_command(TARGET MinimalGame POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_CURRENT_SOURCE_DIR}/content $<TARGET_FILE_DIR:MinimalGame>/content)

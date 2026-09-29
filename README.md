@@ -24,8 +24,10 @@ cmake --build --preset release # executables land in build/release/bin
 ## Use it in a game
 
 A game is a CMake project that pulls Kania in with `FetchContent`;
-[`Examples/MinimalGame`](Examples/MinimalGame/CMakeLists.txt) is the smallest one, an animated
-sprite. Set `KANIA_EXIT_AFTER_FRAMES=N` to make any Kania game quit after N frames.
+[`Examples/MinimalGame`](Examples/MinimalGame/CMakeLists.txt) is the smallest one: an animated
+sprite loaded from the `content/` folder that the build copies next to the executable. Kania's
+virtual file system sees the executable's directory as `/`, so the sprite is at
+`/content/girl.aseprite`. Set `KANIA_EXIT_AFTER_FRAMES=N` to make any Kania game quit after N frames.
 
 ## Run
 
