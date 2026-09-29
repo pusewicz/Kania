@@ -85,10 +85,12 @@ that overrides the pin. It edits and verifies; git, PRs and the plan stay with t
 
 ## CF changes
 
-CF is pinned at a commit on the `kania` branch of the submodule (pusewicz/cute_framework): upstream
-master plus Kania's patches. A patch goes on its own fork branch, with a PR against `kania` that is
-merged with a merge commit, so the commit the Kania submodule points at stays reachable. Push that
-branch before opening the Kania PR that moves the submodule pointer, or clones break.
+Kania maintains its own `kania` branch of CF (pusewicz/cute_framework, the submodule's remote):
+upstream master plus Kania's patches, and the submodule is pinned to a commit on it. Every change
+Kania needs in CF goes onto `kania` as an atomic commit, one change per commit, pushed straight to
+`kania` rather than through a fork PR. Old Kania commits point at `kania`'s commits, so its history
+is never rewritten: upstream changes come in by merging master into it. Push `kania` before pushing
+the Kania branch that moves the submodule pointer, or clones break.
 
 The patches so far:
 - `-msse4.1` is passed only on x86 Linux, so aarch64 Linux builds.
