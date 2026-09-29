@@ -1,7 +1,8 @@
 # TODO
 
-- **Benchmark the real API.** `SpriteBench`'s `overlay-span-inplace` is a hand-rolled copy of
-  `Sprite`, `Entity` and `Vec2`, not `Kania.Draw.sprites`, so a regression in the shipped path
-  wouldn't show up in CI. Have the variant call `Draw.sprites(&sprites)` and delete the copy. The
-  workload becomes `[Sprite]` plus a separate velocity array, so check that its checksum still
-  equals C's and its `submit_ms` stays within noise of `overlay-span-inplace` before deleting that.
+- **Close the `kania` benchmark gap, then drop the copy.** `SpriteBench`'s `kania` variant runs the
+  real `Sprite` and `Draw.sprites`, and at 10k sprites it is 3–8% behind `overlay-span-inplace`, the
+  hand-rolled copy (`PHASE1.md`, "Benchmarking the shipped API"). Make `Sprite.update()` inlinable
+  or find what else costs the difference, then re-measure both in one batch. Once `kania`'s
+  `submit_ms` is within noise, delete `overlay-span-inplace` with its `Vec2`, `Sprite` and `Entity`
+  copy, and make `kania` the default `--impl`.

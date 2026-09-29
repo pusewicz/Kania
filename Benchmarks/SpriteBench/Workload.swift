@@ -24,7 +24,7 @@ struct Random {
 
 /// A per-frame workload. `step(frame:)` submits one frame of draw commands and nothing else,
 /// because it is the only part of the frame the benchmark attributes to the implementation.
-protocol Workload: AnyObject {
+@MainActor protocol Workload: AnyObject {
   /// Submits frame `frame`'s draw commands.
   func step(frame: Int)
 
@@ -32,20 +32,16 @@ protocol Workload: AnyObject {
   var checksum: Double { get }
 }
 
-/// Creates the entities for `count` sprites in the order the C benchmark does, handing each
-/// sprite, position and velocity to `body`.
-func makeEntities(count: Int, _ body: (CF_Sprite, CF_V2, CF_V2) -> Void) {
+/// Generates the entities for `count` sprites in the order the C benchmark does, handing each
+/// one's animation name, position and velocity to `body`. Creating the sprite is left to the
+/// caller, because each implementation builds it through its own API.
+func makeEntities(count: Int, _ body: (_ animation: String, _ position: CF_V2, _ velocity: CF_V2) -> Void) {
   var random = Random()
-  let demo = cf_make_demo_sprite()
   for i in 0..<count {
-    var sprite = demo
-    cf_sprite_play(&sprite, animations[i % animations.count])
     let px = random.next(in: -width / 2, width / 2)
     let py = random.next(in: -height / 2, height / 2)
     let vx = random.next(in: -100, 100)
     let vy = random.next(in: -100, 100)
-    let position = CF_V2(x: px, y: py)
-    let velocity = CF_V2(x: vx, y: vy)
-    body(sprite, position, velocity)
+    body(animations[i % animations.count], CF_V2(x: px, y: py), CF_V2(x: vx, y: vy))
   }
 }

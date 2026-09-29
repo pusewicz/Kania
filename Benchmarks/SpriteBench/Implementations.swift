@@ -1,4 +1,5 @@
 import CCute
+import Kania
 
 // MARK: Raw C import
 
@@ -21,15 +22,17 @@ final class RawBufferWorkload: Workload {
   init(count: Int) {
     entities = .allocate(capacity: count)
     var i = 0
-    makeEntities(count: count) { sprite, position, velocity in
-      var sprite = sprite
+    let demo = cf_make_demo_sprite()
+    makeEntities(count: count) { animation, position, velocity in
+      var sprite = demo
+      cf_sprite_play(&sprite, animation)
       sprite.transform.p = position
       (entities.baseAddress! + i).initialize(to: RawEntity(sprite: sprite, velocity: velocity))
       i += 1
     }
   }
 
-  deinit {
+  isolated deinit {
     entities.deinitialize()
     entities.deallocate()
   }
@@ -110,8 +113,11 @@ final class OverlaySpanInPlaceWorkload: Workload {
   /// Creates `count` entities in the order the C benchmark does.
   init(count: Int) {
     entities.reserveCapacity(count)
-    makeEntities(count: count) { sprite, position, velocity in
-      var s = Sprite(sprite)
+    let demo = cf_make_demo_sprite()
+    makeEntities(count: count) { animation, position, velocity in
+      var raw = demo
+      cf_sprite_play(&raw, animation)
+      var s = Sprite(raw)
       s.position = Vec2(position)
       entities.append(Entity(sprite: s, velocity: Vec2(velocity)))
     }
@@ -124,5 +130,50 @@ final class OverlaySpanInPlaceWorkload: Workload {
       unsafe span[unchecked: i].step(bounds: bounds)
       unsafe span[unchecked: i].sprite.draw()
     }
+  }
+}
+
+// MARK: Kania's public API
+
+/// The shipped API: `Kania.Sprite` values in an `Array` and `Draw.sprites(_:)`, with velocities in
+/// a parallel `SIMD2<Float>` array because the sprite type holds no game state. The game loop moves
+/// and animates each sprite through `MutableSpan`s with unchecked reads, then the batch call makes
+/// a second pass over the same array to queue them. C moves, animates and draws each sprite in one
+/// pass, so this variant pays for the extra pass over the sprites. Both arrays have `count`
+/// elements, filled in lockstep in `init`, so one index from the sprites' span is valid for both.
+final class KaniaWorkload: Workload {
+  private var sprites: [Kania.Sprite] = []
+  private var velocities: [SIMD2<Float>] = []
+
+  var checksum: Double {
+    sprites.reduce(0) { $0 + Double($1.position.x) + Double($1.position.y) }
+  }
+
+  /// Creates `count` sprites from one demo prototype, in the order the C benchmark does.
+  init(count: Int) {
+    sprites.reserveCapacity(count)
+    velocities.reserveCapacity(count)
+    let demo = Kania.Sprite.demo()
+    makeEntities(count: count) { animation, position, velocity in
+      var sprite = demo
+      sprite.play(animation)
+      sprite.position = SIMD2(position.x, position.y)
+      sprites.append(sprite)
+      velocities.append(SIMD2(velocity.x, velocity.y))
+    }
+  }
+
+  /// Moves and animates every sprite, then queues them all with `Draw.sprites(_:)`.
+  func step(frame: Int) {
+    var spriteSpan = sprites.mutableSpan
+    var velocitySpan = velocities.mutableSpan
+    for i in spriteSpan.indices {
+      let p = unsafe spriteSpan[unchecked: i].position + velocitySpan[unchecked: i] * fixedDelta
+      if p.x < -width / 2 || p.x > width / 2 { unsafe velocitySpan[unchecked: i].x.negate() }
+      if p.y < -height / 2 || p.y > height / 2 { unsafe velocitySpan[unchecked: i].y.negate() }
+      unsafe spriteSpan[unchecked: i].position = p
+      unsafe spriteSpan[unchecked: i].update()
+    }
+    Draw.sprites(&sprites)
   }
 }

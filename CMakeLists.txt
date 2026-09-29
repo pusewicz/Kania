@@ -121,7 +121,7 @@ if(KANIA_BUILD_SAMPLES)
     Benchmarks/SpriteBench/main.swift
     Benchmarks/SpriteBench/Implementations.swift
     Benchmarks/SpriteBench/Workload.swift)
-  target_link_libraries(SpriteBench PRIVATE SpikeSupport)
+  target_link_libraries(SpriteBench PRIVATE SpikeSupport Kania)
 
   add_executable(SpriteBenchC Benchmarks/SpriteBenchC/main.c)
   target_link_libraries(SpriteBenchC PRIVATE CCute)
